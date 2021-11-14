@@ -126,9 +126,6 @@ func (mgr *syncMgr) Handler() handlerMgr {
 }
 
 func (mgr *syncMgr) onNewPeer(p2ppeer p2p.Peer) error {
-	if mgr.disable {
-		return nil
-	}
 	p := newPeer(p2ppeer, mgr.version, mgr.network)
 	return mgr.handlePeer(p)
 }
@@ -222,6 +219,9 @@ func (mgr *syncMgr) handleMsg(s sender, p protocolMsgReader) error {
 	msgCh, err := p.GetProtocolMsgCh()
 	if err != nil {
 		return err
+	}
+	if mgr.disable {
+		return nil
 	}
 	select {
 	case msg := <-msgCh:

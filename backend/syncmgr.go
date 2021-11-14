@@ -82,14 +82,13 @@ type syncMgr struct {
 	lastReport    time.Time
 	synchronising int32
 	lastRecord    uint64
-	disable       bool
 }
 
 func newSyncMgr(
 	version, network uint32,
 	chain chainMgr,
 	eventBus *xfsgo.EventBus,
-	txPool *xfsgo.TxPool, disable bool) *syncMgr {
+	txPool *xfsgo.TxPool) *syncMgr {
 	mgr := &syncMgr{
 		chain:       chain,
 		version:     version,
@@ -104,7 +103,6 @@ func newSyncMgr(
 		processCh:   make(chan bool, 1),
 		cancelCh:    make(chan struct{}),
 		queue:       newSyncQueue(),
-		disable:     disable,
 	}
 	hm := newHandlerMgr()
 	syncHanlder := newSyncHandler(chain, mgr.handleHashes,
@@ -219,9 +217,6 @@ func (mgr *syncMgr) handleMsg(s sender, p protocolMsgReader) error {
 	msgCh, err := p.GetProtocolMsgCh()
 	if err != nil {
 		return err
-	}
-	if mgr.disable {
-		return nil
 	}
 	select {
 	case msg := <-msgCh:

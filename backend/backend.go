@@ -157,7 +157,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 	}
 	back.syncMgr = newSyncMgr(
 		back.config.ProtocolVersion, back.config.NetworkID,
-		back.blockchain, back.eventBus, back.txPool)
+		back.blockchain, back.eventBus, back.txPool, config.DisableSync)
 	back.p2pServer.Bind(&chainSyncProtocol{
 		syncMgr: back.syncMgr,
 	})
@@ -165,7 +165,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 }
 
 func (b *Backend) Start() error {
-	if b.config.Params.DisableSync {
+	if b.config.DisableSync {
 		return nil
 	}
 	b.syncMgr.Start()

@@ -82,13 +82,14 @@ type syncMgr struct {
 	lastReport    time.Time
 	synchronising int32
 	lastRecord    uint64
+	disable       bool
 }
 
 func newSyncMgr(
 	version, network uint32,
 	chain chainMgr,
 	eventBus *xfsgo.EventBus,
-	txPool *xfsgo.TxPool) *syncMgr {
+	txPool *xfsgo.TxPool, disable bool) *syncMgr {
 	mgr := &syncMgr{
 		chain:       chain,
 		version:     version,
@@ -103,6 +104,7 @@ func newSyncMgr(
 		processCh:   make(chan bool, 1),
 		cancelCh:    make(chan struct{}),
 		queue:       newSyncQueue(),
+		disable:     disable,
 	}
 	hm := newHandlerMgr()
 	syncHanlder := newSyncHandler(chain, mgr.handleHashes,
@@ -124,6 +126,9 @@ func (mgr *syncMgr) Handler() handlerMgr {
 }
 
 func (mgr *syncMgr) onNewPeer(p2ppeer p2p.Peer) error {
+	if mgr.disable {
+		return nil
+	}
 	p := newPeer(p2ppeer, mgr.version, mgr.network)
 	return mgr.handlePeer(p)
 }

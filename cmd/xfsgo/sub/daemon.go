@@ -166,7 +166,7 @@ func init() {
 	mFlags.StringVarP(&bootstrap, "bootstrap", "", "", "Specify boot node")
 	mFlags.BoolVarP(&testnet, "testnet", "t", false, "Enable test network")
 	mFlags.BoolVarP(&debug, "debug", "", false, "Enable debug")
-	mFlags.BoolVarP(&disablesync, "disablesync", "", disablesync, "Disable sync")
+	mFlags.BoolVarP(&disablesync, "disablesync", "", false, "Disable sync")
 	mFlags.IntVarP(&netid, "netid", "n", 0, "Explicitly set network id")
 	rootCmd.AddCommand(daemonCmd)
 }

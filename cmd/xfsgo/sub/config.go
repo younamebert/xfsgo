@@ -155,9 +155,12 @@ func defaultBootstrapNodes(netid uint32) []string {
 	if netid == 1 {
 		// main net boot nodes
 		return []string{}
-	} else if netid == 2 {
+	}
+	if netid == 2 {
 		// test net boot nodes
-		return []string{}
+		return []string{
+			"xfsnode://139.180.144.201:9011/?id=cc9909b58894a42e1f9d7ceef163b6d4271146e4aa3a2c6a22e2ef9850ad38253c1fa117897c7ed1554492421fc59ae4fb73d163318dd9193bed5efcc7bce75a",
+		}
 	}
 	return make([]string, 0)
 }

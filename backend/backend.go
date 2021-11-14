@@ -57,6 +57,7 @@ type Params struct {
 	ProtocolVersion uint32
 	Debug           bool
 	MinGasPrice     *big.Int
+	DisableSync     bool
 }
 
 // Config contains the configuration options of the Backend.
@@ -164,6 +165,9 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 }
 
 func (b *Backend) Start() error {
+	if b.config.Params.DisableSync {
+		return nil
+	}
 	b.syncMgr.Start()
 	return nil
 }

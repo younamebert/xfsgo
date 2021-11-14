@@ -57,7 +57,6 @@ type Params struct {
 	ProtocolVersion uint32
 	Debug           bool
 	MinGasPrice     *big.Int
-	DisableSync     bool
 }
 
 // Config contains the configuration options of the Backend.
@@ -157,7 +156,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 	}
 	back.syncMgr = newSyncMgr(
 		back.config.ProtocolVersion, back.config.NetworkID,
-		back.blockchain, back.eventBus, back.txPool, config.DisableSync)
+		back.blockchain, back.eventBus, back.txPool)
 	back.p2pServer.Bind(&chainSyncProtocol{
 		syncMgr: back.syncMgr,
 	})
@@ -165,9 +164,6 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 }
 
 func (b *Backend) Start() error {
-	if b.config.DisableSync {
-		return nil
-	}
 	b.syncMgr.Start()
 	return nil
 }

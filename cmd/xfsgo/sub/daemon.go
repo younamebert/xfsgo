@@ -32,15 +32,14 @@ import (
 )
 
 var (
-	rpcaddr     string
-	p2paddr     string
-	datadir     string
-	bootstrap   string
-	testnet     bool
-	disablesync bool
-	debug       bool
-	netid       int
-	daemonCmd   = &cobra.Command{
+	rpcaddr   string
+	p2paddr   string
+	datadir   string
+	bootstrap string
+	testnet   bool
+	debug     bool
+	netid     int
+	daemonCmd = &cobra.Command{
 		Use:                   "daemon [options]",
 		DisableFlagsInUseLine: true,
 		SilenceUsage:          true,
@@ -128,7 +127,6 @@ func runDaemon() error {
 	}()
 	backparams := &config.backendParams
 	backparams.Debug = debug
-	backparams.DisableSync = disablesync
 	if backparams.Debug {
 		logrus.SetLevel(logrus.DebugLevel)
 		logrus.Debugf("Set debug mode")
@@ -166,7 +164,6 @@ func init() {
 	mFlags.StringVarP(&bootstrap, "bootstrap", "", "", "Specify boot node")
 	mFlags.BoolVarP(&testnet, "testnet", "t", false, "Enable test network")
 	mFlags.BoolVarP(&debug, "debug", "", false, "Enable debug")
-	mFlags.BoolVarP(&disablesync, "disablesync", "", false, "Disable sync")
 	mFlags.IntVarP(&netid, "netid", "n", 0, "Explicitly set network id")
 	rootCmd.AddCommand(daemonCmd)
 }

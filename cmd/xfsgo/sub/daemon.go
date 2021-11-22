@@ -134,11 +134,12 @@ func runDaemon() error {
 		logrus.Debugf("Set debug mode")
 	}
 	if back, err = backend.NewBackend(stack, &backend.Config{
-		Params:  backparams,
-		ChainDB: chainDb,
-		KeysDB:  keysDb,
-		StateDB: stateDB,
-		ExtraDB: extraDB,
+		Params:       backparams,
+		NodeSyncFlag: config.nodeConfig.NodeSyncFlag,
+		ChainDB:      chainDb,
+		KeysDB:       keysDb,
+		StateDB:      stateDB,
+		ExtraDB:      extraDB,
 	}); err != nil {
 		return err
 	}

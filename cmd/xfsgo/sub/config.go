@@ -48,6 +48,7 @@ const (
 	defaultProtocolVersion   = uint32(1)
 	defaultLoggerLevel       = "INFO"
 	defaultCliTimeOut        = "180s"
+	defaultNodeSyncFlag      = true
 )
 
 var defaultMinGasPrice = common.DefaultGasPrice()
@@ -150,6 +151,11 @@ func parseConfigStorageParams(v *viper.Viper) storageParams {
 	setupDataDir(&params, params.dataDir)
 	return params
 }
+
+func getDefaultNodeSyncFlag() bool {
+	return defaultNodeSyncFlag
+}
+
 func defaultBootstrapNodes(netid uint32) []string {
 	// hardcoded bootstrap nodes
 	if netid == 1 {
@@ -159,7 +165,6 @@ func defaultBootstrapNodes(netid uint32) []string {
 	if netid == 2 {
 		// test net boot nodes
 		return []string{
-			"xfsnode://139.180.144.201:9011/?id=cc9909b58894a42e1f9d7ceef163b6d4271146e4aa3a2c6a22e2ef9850ad38253c1fa117897c7ed1554492421fc59ae4fb73d163318dd9193bed5efcc7bce75a",
 			"xfsnode://45.63.126.195:9011/?id=66fe5febed75340c88ab00df0c7760e1682b48471d25b3e160eb140cb173422cc4d6dba2921e07d5826d880ede01ecbea32ec4dcc7fb5e7ff16cc34967583319",
 			"xfsnode://119.28.26.67:9011/?id=61d6c98ad5c63db081734667d20dc8de4c6050d2e1ca01b28caa55d0717e5dac07b2b07fe1bcdd15bcf223e2c7146362713baaff5afb96f405d7734ef3977b68",
 			"xfsnode://78.141.192.47:9011/?id=aeb058ca7936d66a59834205e2ef559b14aa37c14578abd8ecc8e64d2d1e58d134dee828814ca1a52101285caa94eb949b185cdd6d8d936e8f41a0beca00845f",
@@ -178,6 +183,8 @@ func parseConfigNodeParams(v *viper.Viper, netid uint32) node.Config {
 	config.P2PBootstraps = v.GetStringSlice("p2pnode.bootstrap")
 	config.P2PStaticNodes = v.GetStringSlice("p2pnode.static")
 	config.ProtocolVersion = uint8(v.GetUint64("protocol.version"))
+	config.NodeSyncFlag = v.GetBool("p2pnode.syncflag")
+
 	if config.RPCConfig.ListenAddr == "" {
 		config.RPCConfig.ListenAddr = defaultNodeRPCListenAddr
 	}
@@ -187,6 +194,11 @@ func parseConfigNodeParams(v *viper.Viper, netid uint32) node.Config {
 	if config.P2PBootstraps == nil || len(config.P2PBootstraps) == 0 {
 		config.P2PBootstraps = defaultBootstrapNodes(netid)
 	}
+
+	if config.NodeSyncFlag || getDefaultNodeSyncFlag() {
+		config.NodeSyncFlag = true
+	}
+
 	return config
 }
 
@@ -216,6 +228,7 @@ func parseConfigBackendParams(v *viper.Viper) backend.Params {
 	if config.NetworkID == 0 {
 		config.NetworkID = defaultNetworkId
 	}
+	config.GenesisFile = v.GetString("protocol.genesisfile")
 	return config
 }
 

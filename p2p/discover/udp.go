@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"container/list"
 	"crypto/ecdsa"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -384,13 +385,19 @@ func encodePacketN(privateKey *ecdsa.PrivateKey, ptype byte, req interface{}, re
 	}
 	datahash := ahash.SHA256(bs)
 	signed, err := crypto.ECDSASign(datahash, privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("can't sign discv4 packet%v", err)
+	}
 	b.Write(signed)
 	b.Write(remote[:])
-	dataLen := len(bs)
-	if (dataLen >> 8) > 0 {
-		return nil, fmt.Errorf("out")
-	}
-	b.WriteByte(byte(dataLen))
+
+	var dataLen uint32 = uint32(len(bs))
+	// if (dataLen >> 8) > 0 {
+	// 	return nil, fmt.Errorf("out")
+	// }
+	var byteLen []byte = make([]byte, 4)
+	binary.BigEndian.PutUint32(byteLen, dataLen)
+	b.Write(byteLen)
 	b.Write(bs)
 	return b.Bytes(), nil
 }
@@ -451,7 +458,7 @@ func (t *udp) handlePacket(from *net.UDPAddr, buf []byte) error {
 type packetHeadN struct {
 	mType   uint8
 	sign    [65]byte
-	dataLen uint8
+	dataLen uint32
 	remote  NodeId
 }
 type packetHead struct {
@@ -484,8 +491,8 @@ func decodePacketHead(reader io.Reader) (*packetHead, int, error) {
 	return ph, last, nil
 }
 
-// headerLen = type(1) + sign(65) + remote(64) + len(1)
-const headerLen1 = 131
+// headerLen = type(1) + sign(65) + remote(64) + len(4)
+const headerLen1 = 134
 
 func decodePacketHeadN(reader io.Reader) (*packetHeadN, int, error) {
 	// 0000
@@ -501,11 +508,11 @@ func decodePacketHeadN(reader io.Reader) (*packetHeadN, int, error) {
 		last += n
 	}
 	ph := new(packetHeadN)
-	mType, sign, remote, dataLen := hbytes[0], hbytes[1:66], hbytes[66:130], hbytes[130]
+	mType, sign, remote, dataLen := hbytes[0], hbytes[1:66], hbytes[66:130], hbytes[130:134]
 	ph.mType = mType
 	copy(ph.sign[:], sign[:])
 	copy(ph.remote[:], remote)
-	ph.dataLen = dataLen
+	ph.dataLen = binary.BigEndian.Uint32(dataLen)
 	return ph, last, nil
 }
 
@@ -525,7 +532,7 @@ func decodePacketN(reader io.Reader, self NodeId) (packet, NodeId, error) {
 		return nil, NodeId{}, fmt.Errorf("id not match")
 	}
 	var data = make([]byte, h.dataLen)
-	last := uint8(0)
+	last := uint32(0)
 	for last < h.dataLen {
 		var buf [^uint8(0)]byte
 		n, err := reader.Read(buf[:])
@@ -533,7 +540,7 @@ func decodePacketN(reader io.Reader, self NodeId) (packet, NodeId, error) {
 			return nil, NodeId{}, err
 		}
 		copy(data[last:int(last)+n], buf[:n])
-		last += uint8(n)
+		last += uint32(n)
 	}
 	datahash := ahash.SHA256(data)
 	nid, err := recoverNodeId(datahash, h.sign[:])

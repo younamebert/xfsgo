@@ -17,6 +17,7 @@ keys/
 target/
 /xfsgo
 
+*.json
 *.log
 *.yml
 !.golangci.yml

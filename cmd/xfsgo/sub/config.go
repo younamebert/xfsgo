@@ -228,6 +228,7 @@ func parseConfigBackendParams(v *viper.Viper) backend.Params {
 	if config.NetworkID == 0 {
 		config.NetworkID = defaultNetworkId
 	}
+	config.GenesisFile = v.GetString("protocol.genesisfile")
 	return config
 }
 

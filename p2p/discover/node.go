@@ -13,7 +13,7 @@ import (
 	"xfsgo/crypto"
 )
 
-const nodeIdLen int = 64
+const nodeIdLen int = 32
 
 type NodeId [nodeIdLen]byte
 

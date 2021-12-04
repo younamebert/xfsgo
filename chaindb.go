@@ -54,7 +54,9 @@ func (db *chainDB) GetBlockHeaderByHash(hash common.Hash) *BlockHeader {
 		return nil
 	}
 	blockHeader := &BlockHeader{}
+
 	if err := rawencode.Decode(val, blockHeader); err != nil {
+		logrus.Debugf("Decode:%v", err)
 		return nil
 	}
 	return blockHeader

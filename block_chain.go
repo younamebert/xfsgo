@@ -25,7 +25,6 @@ import (
 	"time"
 	"xfsgo/common"
 	"xfsgo/storage/badger"
-	"xfsgo/vm/simplevm"
 
 	"github.com/sirupsen/logrus"
 )
@@ -948,21 +947,21 @@ func (bc *BlockChain) ApplyTransactionN(
 	if err = useGas(gas, common.CalcTxInitialCost(tx.Data)); err != nil {
 		return nil, err
 	}
-	if TxToAddrNotSet(tx) {
-		vm := simplevm.New(sender)
-		if err = vm.Exec(tx.Data); err == nil {
-			status = 1
-			sender.SetData()
-		}
-	} else {
-		fromaddr, _ := tx.FromAddr()
-		txhash := tx.Hash()
-		logrus.Debugf("Transfer: from=%s, to=%s, value=%s, txhash=%x", fromaddr.B58String(), tx.To.B58String(), tx.Value, txhash[len(txhash)-4:])
-		if err = bc.transfer(stateTree, sender, tx.To, tx.Value); err != nil {
-			return nil, err
-		}
-		status = 1
+	// if TxToAddrNotSet(tx) {
+	// 	vm := simplevm.New(sender)
+	// 	if err = vm.Exec(tx.Data); err == nil {
+	// 		status = 1
+	// 		sender.SetData()
+	// 	}
+	// } else {
+	fromaddr, _ := tx.FromAddr()
+	txhash := tx.Hash()
+	logrus.Debugf("Transfer: from=%s, to=%s, value=%s, txhash=%x", fromaddr.B58String(), tx.To.B58String(), tx.Value, txhash[len(txhash)-4:])
+	if err = bc.transfer(stateTree, sender, tx.To, tx.Value); err != nil {
+		return nil, err
 	}
+	status = 1
+	// }
 	stateTree.AddNonce(sender.address, 1)
 
 	// refundGas
@@ -1000,21 +999,21 @@ func (bc *BlockChain) ApplyTransaction(
 	if err = useGas(gas, common.CalcTxInitialCost(tx.Data)); err != nil {
 		return nil, err
 	}
-	if TxToAddrNotSet(tx) {
-		vm := simplevm.New(sender)
-		if err = vm.Exec(tx.Data); err == nil {
-			status = 1
-			sender.SetData()
-		}
-	} else {
-		fromaddr, _ := tx.FromAddr()
-		txhash := tx.Hash()
-		logrus.Debugf("Transfer: from=%s, to=%s, value=%s, txhash=%x", fromaddr.B58String(), tx.To.B58String(), tx.Value, txhash[len(txhash)-4:])
-		if err = bc.transfer(stateTree, sender, tx.To, tx.Value); err != nil {
-			return nil, err
-		}
-		status = 1
+	// if TxToAddrNotSet(tx) {
+	// 	vm := simplevm.New(sender)
+	// 	if err = vm.Exec(tx.Data); err == nil {
+	// 		status = 1
+	// 		sender.SetData()
+	// 	}
+	// } else {
+	fromaddr, _ := tx.FromAddr()
+	txhash := tx.Hash()
+	logrus.Debugf("Transfer: from=%s, to=%s, value=%s, txhash=%x", fromaddr.B58String(), tx.To.B58String(), tx.Value, txhash[len(txhash)-4:])
+	if err = bc.transfer(stateTree, sender, tx.To, tx.Value); err != nil {
+		return nil, err
 	}
+	status = 1
+	// }
 	stateTree.AddNonce(sender.address, 1)
 
 	// refundGas

@@ -32,14 +32,15 @@ import (
 )
 
 var (
-	rpcaddr   string
-	p2paddr   string
-	datadir   string
-	bootstrap string
-	testnet   bool
-	debug     bool
-	netid     int
-	daemonCmd = &cobra.Command{
+	rpcaddr          string
+	p2paddr          string
+	datadir          string
+	bootstrap        string
+	testnet          bool
+	debug            bool
+	disableBootstrap bool
+	netid            int
+	daemonCmd        = &cobra.Command{
 		Use:                   "daemon [options]",
 		DisableFlagsInUseLine: true,
 		SilenceUsage:          true,
@@ -74,7 +75,7 @@ func resetConfig(config *daemonConfig) {
 		config.backendParams.NetworkID = defaultTestNetworkId
 		config.nodeConfig.P2PBootstraps = defaultBootstrapNodes(defaultTestNetworkId)
 	}
-	if bootstrap == "none" {
+	if disableBootstrap {
 		config.nodeConfig.P2PBootstraps = make([]string, 0)
 	} else if bootstrap != "" {
 		config.nodeConfig.P2PBootstraps = strings.Split(bootstrap, ",")
@@ -86,6 +87,7 @@ func runDaemon() error {
 		stack *node.Node       = nil
 		back  *backend.Backend = nil
 	)
+
 	config, err := parseDaemonConfig(cfgFile) // default config
 	if err != nil {
 		return err
@@ -163,6 +165,7 @@ func init() {
 	mFlags.StringVarP(&datadir, "datadir", "d", "", "Set Data directory")
 	mFlags.StringVarP(&bootstrap, "bootstrap", "", "", "Specify boot node")
 	mFlags.BoolVarP(&testnet, "testnet", "t", false, "Enable test network")
+	mFlags.BoolVarP(&disableBootstrap, "dbootstrap", "", false, "Disable Bootstrap")
 	mFlags.BoolVarP(&debug, "debug", "", false, "Enable debug")
 	mFlags.IntVarP(&netid, "netid", "n", 0, "Explicitly set network id")
 	rootCmd.AddCommand(daemonCmd)

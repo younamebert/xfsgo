@@ -222,7 +222,8 @@ func parseConfigBackendParams(v *viper.Viper) backend.Params {
 
 func parseDaemonConfig(configFilePath string) (daemonConfig, error) {
 	config := viper.New()
-	if err := readFromConfigPath(config, configFilePath); err != nil {
+	if err := readFromConfigPath(config, configFilePath); err != nil && configFilePath != "" {
+		return daemonConfig{}, err
 	}
 	mStorageParams := parseConfigStorageParams(config)
 	mBackendParams := parseConfigBackendParams(config)
@@ -239,7 +240,8 @@ func parseDaemonConfig(configFilePath string) (daemonConfig, error) {
 
 func parseClientConfig(configFilePath string) (clientConfig, error) {
 	config := viper.New()
-	if err := readFromConfigPath(config, configFilePath); err != nil {
+	if err := readFromConfigPath(config, configFilePath); err != nil && configFilePath != "" {
+		return clientConfig{}, err
 	}
 	mRpcClientApiHost := config.GetString("rpclient.apihost")
 	if rpchost == "" {

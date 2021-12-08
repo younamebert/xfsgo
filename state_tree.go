@@ -180,9 +180,9 @@ func (so *StateObj) Update() {
 // 	}
 // 	so.extra = so.buffer.Bytes()
 // }
-// func (so *StateObj) GetData() []byte {
-// 	return so.extra
-// }
+func (so *StateObj) GetData() []byte {
+	return so.code
+}
 
 func (s *StateObj) SetCode(codeHash common.Hash, code []byte) {
 	// prevcode := s.Code(s.db.db)

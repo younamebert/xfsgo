@@ -290,7 +290,7 @@ func (m *Miner) applyTransactions(
 	ignoreTxs map[common.Address]struct{},
 	commitTxs *[]*xfsgo.Transaction) (*big.Int, []*xfsgo.Receipt, error) {
 	receipts := make([]*xfsgo.Receipt, 0)
-	totalUsedGas := big.NewInt(0)
+	var totalUsedGas uint64 = 0
 	mGasPool := (*xfsgo.GasPool)(new(big.Int).Set(header.GasLimit))
 	//pergp := (*big.Int)(mGasPool)
 	//logrus.Debugf("Tx gas limit out of block limit-init: hash=%x, from=%x, mGasPool=%s", txfrom, pergp)
@@ -303,7 +303,8 @@ func (m *Miner) applyTransactions(
 			//	txhash[len(txhash)-4:], txfrom)
 			continue
 		}
-		rec, err := m.chain.ApplyTransaction(stateTree, header, tx, mGasPool, totalUsedGas)
+		rec, err := xfsgo.ApplyTransaction(m.chain, nil, mGasPool, stateTree, header, tx, &totalUsedGas, *m.chain.GetVMConfig())
+		// rec, err := m.chain.ApplyTransaction(stateTree, header, tx, mGasPool, totalUsedGas)
 		if err != nil {
 			if err.Error() == xfsgo.GasPoolOutErr.Error() {
 				//logrus.Errorf("Miner apply transaction err will be ignore: %s", err)
@@ -320,7 +321,7 @@ func (m *Miner) applyTransactions(
 		//logrus.Debugf("Commit tx: %x",txhash[len(txhash)-4:])
 		*commitTxs = append(*commitTxs, tx)
 	}
-	return totalUsedGas, receipts, nil
+	return new(big.Int).SetUint64(totalUsedGas), receipts, nil
 }
 
 func (m *Miner) mimeBlockWithParent(

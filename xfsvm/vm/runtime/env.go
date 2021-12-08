@@ -17,7 +17,7 @@
 package runtime
 
 import (
-	"xfsgo/xfsvm"
+	"xfsgo"
 	"xfsgo/xfsvm/vm"
 )
 
@@ -27,8 +27,8 @@ func NewEnv(cfg *Config) *vm.EVM {
 		GasPrice: cfg.GasPrice,
 	}
 	blockContext := vm.BlockContext{
-		CanTransfer: xfsvm.CanTransfer,
-		Transfer:    xfsvm.Transfer,
+		CanTransfer: xfsgo.CanTransfer,
+		Transfer:    xfsgo.Transfer,
 		GetHash:     cfg.GetHashFn,
 		Coinbase:    cfg.Coinbase,
 		BlockNumber: cfg.BlockNumber,
@@ -38,5 +38,5 @@ func NewEnv(cfg *Config) *vm.EVM {
 		BaseFee:     cfg.BaseFee,
 	}
 
-	return vm.NewEVM(blockContext, txContext, cfg.State, cfg.ChainConfig, cfg.EVMConfig)
+	return vm.NewEVM(blockContext, txContext, cfg.State, cfg.EVMConfig)
 }

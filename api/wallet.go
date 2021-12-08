@@ -189,10 +189,6 @@ func (handler *WalletHandler) SendTransaction(args SendTransactionArgs, resp *st
 		err   error
 		stdTx = new(xfsgo.StdTransaction)
 	)
-	// Judgment target address cannot be empty
-	if args.To == "" {
-		return xfsgo.NewRPCError(-1006, "to addr not be empty")
-	}
 	// Judge that the transfer amount cannot be blank
 	if args.Value == "" {
 		return xfsgo.NewRPCError(-1006, "value not be empty")
@@ -257,6 +253,12 @@ func (handler *WalletHandler) SendTransaction(args SendTransactionArgs, resp *st
 	if err != nil {
 		return xfsgo.NewRPCErrorCause(-1006, err)
 	}
+
+	// Judgment target address cannot be empty
+	if args.To == "" {
+		return xfsgo.NewRPCError(-1006, "to addr not be empty")
+	}
+
 	result := tx.Hash()
 	*resp = result.Hex()
 	return nil

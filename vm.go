@@ -14,12 +14,10 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package xfsvm
+package xfsgo
 
 import (
 	"math/big"
-	"xfsgo"
-
 	"xfsgo/common"
 	"xfsgo/xfsvm/vm"
 )
@@ -28,11 +26,11 @@ import (
 // current blockchain to be used during transaction processing.
 type ChainContext interface {
 	// GetHeader returns the hash corresponding to their hash.
-	GetHeader(common.Hash, uint64) *xfsgo.BlockHeader
+	GetHeader(common.Hash, uint64) *BlockHeader
 }
 
 // NewEVMBlockContext creates a new context for use in the EVM.
-func NewEVMBlockContext(header *xfsgo.BlockHeader, chain ChainContext, author *common.Address) vm.BlockContext {
+func NewEVMBlockContext(header *BlockHeader, chain ChainContext, author *common.Address) vm.BlockContext {
 	var (
 		beneficiary common.Address
 		baseFee     *big.Int
@@ -61,14 +59,6 @@ func NewEVMBlockContext(header *xfsgo.BlockHeader, chain ChainContext, author *c
 }
 
 // NewEVMTxContext creates a new transaction context for a single transaction.
-// func NewEVMTxContext(msg Message) vm.TxContext {
-// 	return vm.TxContext{
-// 		Origin:   msg.From(),
-// 		GasPrice: new(big.Int).Set(msg.GasPrice()),
-// 	}
-// }
-
-// NewEVMTxContext creates a new transaction context for a single transaction.
 func NewEVMTxContext(msg Message) vm.TxContext {
 	return vm.TxContext{
 		Origin:   msg.From(),
@@ -77,7 +67,7 @@ func NewEVMTxContext(msg Message) vm.TxContext {
 }
 
 // GetHashFn returns a GetHashFunc which retrieves header hashes by number
-func GetHashFn(ref *xfsgo.BlockHeader, chain ChainContext) func(n uint64) common.Hash {
+func GetHashFn(ref *BlockHeader, chain ChainContext) func(n uint64) common.Hash {
 	// Cache will initially contain [refHash.parent],
 	// Then fill up with [refHash.p, refHash.pp, refHash.ppp, ...]
 	var cache []common.Hash

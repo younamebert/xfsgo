@@ -37,8 +37,6 @@ import (
 	"testing"
 	"xfsgo"
 	"xfsgo/common"
-	"xfsgo/params"
-	"xfsgo/xfsvm"
 
 	"xfsgo/xfsvm/abi"
 	"xfsgo/xfsvm/vm"
@@ -101,60 +99,55 @@ func TestNewEVMBlockContext(t *testing.T) {
 
 	fmt.Println(fromAddress, toAddress)
 	abiFileName := "../xfsvm/file/coin_sol_Coin.abi"
-	// binFileName := "../xfsvm/file/coin_sol_Coin.bin"
-	data := "PUSH1 0x80 PUSH1 0x40 MSTORE CALLVALUE DUP1 ISZERO PUSH2 0x10 JUMPI PUSH1 0x0 DUP1 REVERT JUMPDEST POP PUSH2 0x150 DUP1 PUSH2 0x20 PUSH1 0x0 CODECOPY PUSH1 0x0 RETURN INVALID PUSH1 0x80 PUSH1 0x40 MSTORE CALLVALUE DUP1 ISZERO PUSH2 0x10 JUMPI PUSH1 0x0 DUP1 REVERT JUMPDEST POP PUSH1 0x4 CALLDATASIZE LT PUSH2 0x36 JUMPI PUSH1 0x0 CALLDATALOAD PUSH1 0xE0 SHR DUP1 PUSH4 0x2E64CEC1 EQ PUSH2 0x3B JUMPI DUP1 PUSH4 0x6057361D EQ PUSH2 0x59 JUMPI JUMPDEST PUSH1 0x0 DUP1 REVERT JUMPDEST PUSH2 0x43 PUSH2 0x75 JUMP JUMPDEST PUSH1 0x40 MLOAD PUSH2 0x50 SWAP2 SWAP1 PUSH2 0xD9 JUMP JUMPDEST PUSH1 0x40 MLOAD DUP1 SWAP2 SUB SWAP1 RETURN JUMPDEST PUSH2 0x73 PUSH1 0x4 DUP1 CALLDATASIZE SUB DUP2 ADD SWAP1 PUSH2 0x6E SWAP2 SWAP1 PUSH2 0x9D JUMP JUMPDEST PUSH2 0x7E JUMP JUMPDEST STOP JUMPDEST PUSH1 0x0 DUP1 SLOAD SWAP1 POP SWAP1 JUMP JUMPDEST DUP1 PUSH1 0x0 DUP2 SWAP1 SSTORE POP POP JUMP JUMPDEST PUSH1 0x0 DUP2 CALLDATALOAD SWAP1 POP PUSH2 0x97 DUP2 PUSH2 0x103 JUMP JUMPDEST SWAP3 SWAP2 POP POP JUMP JUMPDEST PUSH1 0x0 PUSH1 0x20 DUP3 DUP5 SUB SLT ISZERO PUSH2 0xB3 JUMPI PUSH2 0xB2 PUSH2 0xFE JUMP JUMPDEST JUMPDEST PUSH1 0x0 PUSH2 0xC1 DUP5 DUP3 DUP6 ADD PUSH2 0x88 JUMP JUMPDEST SWAP2 POP POP SWAP3 SWAP2 POP POP JUMP JUMPDEST PUSH2 0xD3 DUP2 PUSH2 0xF4 JUMP JUMPDEST DUP3 MSTORE POP POP JUMP JUMPDEST PUSH1 0x0 PUSH1 0x20 DUP3 ADD SWAP1 POP PUSH2 0xEE PUSH1 0x0 DUP4 ADD DUP5 PUSH2 0xCA JUMP JUMPDEST SWAP3 SWAP2 POP POP JUMP JUMPDEST PUSH1 0x0 DUP2 SWAP1 POP SWAP2 SWAP1 POP JUMP JUMPDEST PUSH1 0x0 DUP1 REVERT JUMPDEST PUSH2 0x10C DUP2 PUSH2 0xF4 JUMP JUMPDEST DUP2 EQ PUSH2 0x117 JUMPI PUSH1 0x0 DUP1 REVERT JUMPDEST POP JUMP INVALID LOG2 PUSH5 0x6970667358 0x22 SLT KECCAK256 BLOCKHASH 0x4E CALLDATACOPY DELEGATECALL DUP8 0xA8 SWAP11 SWAP4 0x2D 0xCA 0x5E PUSH24 0xFAAF6CA2DE3B991F93D230604B1B8DAAEF64766264736F6C PUSH4 0x43000807 STOP CALLER "
+	data := "0x606060405260818060106000396000f360606040526000357c010000000000000000000000000000000000000000000000000000000090048063165c4a16146039576035565b6002565b34600257605a60048080359060200190919080359060200190919050506070565b6040518082815260200191505060405180910390f35b60008183029050607b565b9291505056"
 
-	// data := []byte{byte(vm.PUSH1), 0, byte(vm.PUSH1), 0, byte(vm.RETURN)}
 	cc := ChainContext{}
-	ctx := xfsvm.NewEVMBlockContext(cc.GetHeader(testHash, 0), cc, &fromAddress)
+	ctx := xfsgo.NewEVMBlockContext(cc.GetHeader(testHash, 0), cc, &fromAddress)
 
-	msg := xfsvm.NewMessage(fromAddress, nil, nonce, amount, gasLimit, big.NewInt(1), common.Hex2bytes(data), false)
-	txContext := xfsvm.NewEVMTxContext(msg)
+	msg := xfsgo.NewMessage(fromAddress, common.Address{}, nonce, amount, 1000, big.NewInt(1), common.Hex2bytes(data), nil)
+	txContext := xfsgo.NewEVMTxContext(msg)
 
 	stateDB := NewMemStorage()
 	stateTree := xfsgo.NewStateTree(stateDB, nil)
 	stateTree.GetOrNewStateObj(fromAddress)
-	// stateTree.GetOrNewStateObj(toAddress)
 	stateTree.AddBalance(fromAddress, big.NewInt(1e18))
 	testBalance := stateTree.GetBalance(fromAddress)
 	fmt.Println("init testBalance =", testBalance)
 
-	config := params.MainnetChainConfig
 	logConfig := vm.LogConfig{}
 	structLogger := vm.NewStructLogger(&logConfig)
 	vmConfig := vm.Config{Debug: true, Tracer: structLogger /*, JumpTable: vm.NewByzantiumInstructionSet()*/}
 
-	evm := vm.NewEVM(ctx, txContext, stateTree, config, vmConfig)
+	evm := vm.NewEVM(ctx, txContext, stateTree, vmConfig)
 	contractRef := vm.AccountRef(fromAddress)
 	fmt.Println(fromAddress, contractRef)
 	contractCode, contractAddr, gasLeftover, err := evm.Create(contractRef, common.Hex2bytes(data), 1000000, big.NewInt(1000000000))
 	fmt.Printf("err:%v\n", err)
 
-	fmt.Printf("contractAddr:%v,gasLeftover:%v\n", contractAddr, gasLeftover)
-	fmt.Printf("contractCode:%v,code:%v\n", contractCode, stateTree.GetCode(contractAddr))
+	fmt.Printf("contractAddr:%v,gasLeftover:%v\n", contractAddr.Hex(), gasLeftover)
+	fmt.Printf("code_contractCode:%v\n", contractCode)
+	fmt.Printf("stateTree.GetCode()_contractCode:%v\n", stateTree.GetCode(contractAddr))
 
 	testBalance = stateTree.GetBalance(fromAddress)
 	contractAddrBal := stateTree.GetBalance(contractAddr)
-	fmt.Printf("after create contract, testBalance%v,contractAddr=%v\n", testBalance, contractAddrBal)
+	fmt.Printf("after create contract, Balance=%v,contractAddrBal=%v\n", testBalance, contractAddrBal)
 
 	abiObj := loadAbi(abiFileName)
-	input, err := abiObj.Pack("store", big.NewInt(1))
+	input, err := abiObj.Pack("multiply", big.NewInt(1), big.NewInt(2))
 	must(err)
 	outputs, gasLeftover, vmerr := evm.Call(contractRef, contractAddr, input, stateTree.GetBalance(fromAddress).Uint64(), big.NewInt(0))
 	must(vmerr)
 
 	fmt.Printf("call outputs %v\n", outputs)
-	fmt.Printf("call contractRef %v\n", contractRef)
 	fmt.Printf("call gasLeftover %v\n", gasLeftover)
 
-	sender := common.Bytes2Address(outputs)
+	input1, err1 := abiObj.Pack("multiply", big.NewInt(3), big.NewInt(4))
+	must(err1)
+	outputs1, gasLeftover1, vmerr1 := evm.Call(contractRef, contractAddr, input1, stateTree.GetBalance(fromAddress).Uint64(), big.NewInt(0))
+	must(vmerr1)
 
-	senderAcc := vm.AccountRef(sender)
+	fmt.Printf("call outputs %v\n", outputs1)
+	// fmt.Printf("call contractRef %v\n", contractRef1)
+	fmt.Printf("call gasLeftover %v\n", gasLeftover1)
 
-	input, _ = abiObj.Pack("retrieve")
-	outputs, gasLeftover, _ = evm.Call(senderAcc, contractAddr, input, stateTree.GetBalance(fromAddress).Uint64(), big.NewInt(0))
-
-	fmt.Printf("call outputs %v\n", outputs)
-	fmt.Printf("call contractRef %v\n", contractRef)
-	fmt.Printf("call gasLeftover %v\n", gasLeftover)
 }

@@ -410,13 +410,13 @@ func (t *udp) handlePacketN(from *net.UDPAddr, buf []byte) error {
 type packetHeadN struct {
 	version  uint8    // Version
 	packType uint8    // Type
-	from     [32]byte // From
-	to       [32]byte // To
+	from     [64]byte // From
+	to       [64]byte // To
 	sign     [65]byte // Signature
 	len      uint32   // Payload Length
 }
 
-const headerLen = 135
+const headerLen = 199
 
 func decodePacketHeadN(reader io.Reader) (*packetHeadN, int, error) {
 	// 0000
@@ -432,7 +432,7 @@ func decodePacketHeadN(reader io.Reader) (*packetHeadN, int, error) {
 		last += n
 	}
 	ph := new(packetHeadN)
-	version, mType, from, to, sign, dataLen := hbytes[0], hbytes[1], hbytes[2:34], hbytes[34:66], hbytes[66:131], hbytes[131:135]
+	version, mType, from, to, sign, dataLen := hbytes[0], hbytes[1], hbytes[2:66], hbytes[66:130], hbytes[130:195], hbytes[195:199]
 	ph.version = version
 	ph.packType = mType
 	copy(ph.sign[:], sign[:])
@@ -472,7 +472,7 @@ func decodePacketN(reader io.Reader, self NodeId) (packet, NodeId, NodeId, error
 	}
 	datahash := ahash.SHA256(data)
 
-	var from [32]byte // FromID
+	var from [64]byte // FromID
 	copy(from[:], h.from[:])
 	nid, err := recoverNodeId(datahash, h.sign[:])
 	if err != nil {

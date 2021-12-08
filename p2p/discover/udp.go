@@ -527,7 +527,7 @@ func decodePacketN(reader io.Reader, self NodeId) (packet, NodeId, error) {
 	var data = make([]byte, h.dataLen)
 	last := uint8(0)
 	for last < h.dataLen {
-		var buf [^uint8(0)]byte
+		var buf = make([]byte, h.dataLen)
 		n, err := reader.Read(buf[:])
 		if err != nil && err == io.EOF {
 			return nil, NodeId{}, err

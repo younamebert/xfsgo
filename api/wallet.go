@@ -23,8 +23,6 @@ import (
 	"sort"
 	"xfsgo"
 	"xfsgo/common"
-
-	"github.com/sirupsen/logrus"
 )
 
 type WalletHandler struct {
@@ -269,7 +267,6 @@ func (handler *WalletHandler) Contract(args SendTransactionArgs, resp *string) e
 	code := common.Hex2bytes(args.Code)
 	stdTx.Data = code[:]
 
-	logrus.Debugf("stdTx.Data:%v----%v", stdTx.Data, code)
 	// Judge that the transfer amount cannot be blank
 	if args.Value == "" {
 		return xfsgo.NewRPCError(-1006, "value not be empty")

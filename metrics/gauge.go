@@ -34,7 +34,7 @@ func NewRegisteredGauge(name string, r Registry) Gauge {
 	if nil == r {
 		r = DefaultRegistry
 	}
-	r.Register(name, c)
+	_ = r.Register(name, c)
 	return c
 }
 
@@ -52,7 +52,7 @@ func NewRegisteredFunctionalGauge(name string, r Registry, f func() int64) Gauge
 	if nil == r {
 		r = DefaultRegistry
 	}
-	r.Register(name, c)
+	_ = r.Register(name, c)
 	return c
 }
 

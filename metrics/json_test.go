@@ -10,8 +10,8 @@ func TestRegistryMarshallJSON(t *testing.T) {
 	b := &bytes.Buffer{}
 	enc := json.NewEncoder(b)
 	r := NewRegistry()
-	r.Register("counter", NewCounter())
-	enc.Encode(r)
+	_ = r.Register("counter", NewCounter())
+	_ = enc.Encode(r)
 	if s := b.String(); s != "{\"counter\":{\"count\":0}}\n" {
 		t.Fatalf(s)
 	}
@@ -19,7 +19,7 @@ func TestRegistryMarshallJSON(t *testing.T) {
 
 func TestRegistryWriteJSONOnce(t *testing.T) {
 	r := NewRegistry()
-	r.Register("counter", NewCounter())
+	_ = r.Register("counter", NewCounter())
 	b := &bytes.Buffer{}
 	WriteJSONOnce(r, b)
 	if s := b.String(); s != "{\"counter\":{\"count\":0}}\n" {

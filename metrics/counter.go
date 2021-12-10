@@ -53,7 +53,7 @@ func NewRegisteredCounter(name string, r Registry) Counter {
 	if nil == r {
 		r = DefaultRegistry
 	}
-	r.Register(name, c)
+	_ = r.Register(name, c)
 	return c
 }
 
@@ -66,7 +66,7 @@ func NewRegisteredCounterForced(name string, r Registry) Counter {
 	if nil == r {
 		r = DefaultRegistry
 	}
-	r.Register(name, c)
+	_ = r.Register(name, c)
 	return c
 }
 

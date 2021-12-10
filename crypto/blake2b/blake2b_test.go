@@ -183,7 +183,7 @@ func testHashes2X(t *testing.T) {
 
 		h.Reset()
 		for j := 0; j < len(input); j++ {
-			h.Write(input[j : j+1])
+			_, _ = h.Write(input[j : j+1])
 		}
 		for j := 0; j < len(sum); j++ {
 			h = h.Clone()

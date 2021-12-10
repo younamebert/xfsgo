@@ -89,7 +89,7 @@ func (r *StandardRegistry) GetOrRegister(name string, i interface{}) interface{}
 	if v := reflect.ValueOf(i); v.Kind() == reflect.Func {
 		i = v.Call(nil)[0].Interface()
 	}
-	r.register(name, i)
+	_ = r.register(name, i)
 	return i
 }
 

@@ -34,7 +34,7 @@ func NewRegisteredGaugeFloat64(name string, r Registry) GaugeFloat64 {
 	if nil == r {
 		r = DefaultRegistry
 	}
-	r.Register(name, c)
+	_ = r.Register(name, c)
 	return c
 }
 
@@ -52,7 +52,7 @@ func NewRegisteredFunctionalGaugeFloat64(name string, r Registry, f func() float
 	if nil == r {
 		r = DefaultRegistry
 	}
-	r.Register(name, c)
+	_ = r.Register(name, c)
 	return c
 }
 

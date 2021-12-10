@@ -36,7 +36,7 @@ func NewRegisteredResettingTimer(name string, r Registry) ResettingTimer {
 	if nil == r {
 		r = DefaultRegistry
 	}
-	r.Register(name, c)
+	_ = r.Register(name, c)
 	return c
 }
 

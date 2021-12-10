@@ -61,12 +61,12 @@ func RegisterDebugGCStats(r Registry) {
 	debugMetrics.GCStats.PauseTotal = NewGauge()
 	debugMetrics.ReadGCStats = NewTimer()
 
-	r.Register("debug.GCStats.LastGC", debugMetrics.GCStats.LastGC)
-	r.Register("debug.GCStats.NumGC", debugMetrics.GCStats.NumGC)
-	r.Register("debug.GCStats.Pause", debugMetrics.GCStats.Pause)
+	_ = r.Register("debug.GCStats.LastGC", debugMetrics.GCStats.LastGC)
+	_ = r.Register("debug.GCStats.NumGC", debugMetrics.GCStats.NumGC)
+	_ = r.Register("debug.GCStats.Pause", debugMetrics.GCStats.Pause)
 	//r.Register("debug.GCStats.PauseQuantiles", debugMetrics.GCStats.PauseQuantiles)
-	r.Register("debug.GCStats.PauseTotal", debugMetrics.GCStats.PauseTotal)
-	r.Register("debug.ReadGCStats", debugMetrics.ReadGCStats)
+	_ = r.Register("debug.GCStats.PauseTotal", debugMetrics.GCStats.PauseTotal)
+	_ = r.Register("debug.ReadGCStats", debugMetrics.ReadGCStats)
 }
 
 // Allocate an initial slice for gcStats.Pause to avoid allocations during

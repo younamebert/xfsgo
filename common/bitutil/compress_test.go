@@ -175,6 +175,6 @@ func benchmarkEncoding(b *testing.B, bytes int, fill float64) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		bitsetDecodeBytes(bitsetEncodeBytes(data), len(data))
+		_, _ = bitsetDecodeBytes(bitsetEncodeBytes(data), len(data))
 	}
 }

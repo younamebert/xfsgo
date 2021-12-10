@@ -50,7 +50,7 @@ func NewRegisteredHistogram(name string, r Registry, s Sample) Histogram {
 	if nil == r {
 		r = DefaultRegistry
 	}
-	r.Register(name, c)
+	_ = r.Register(name, c)
 	return c
 }
 

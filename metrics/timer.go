@@ -58,7 +58,7 @@ func NewRegisteredTimer(name string, r Registry) Timer {
 	if nil == r {
 		r = DefaultRegistry
 	}
-	r.Register(name, c)
+	_ = r.Register(name, c)
 	return c
 }
 

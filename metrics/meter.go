@@ -82,7 +82,7 @@ func NewRegisteredMeter(name string, r Registry) Meter {
 	if nil == r {
 		r = DefaultRegistry
 	}
-	r.Register(name, c)
+	_ = r.Register(name, c)
 	return c
 }
 
@@ -95,7 +95,7 @@ func NewRegisteredMeterForced(name string, r Registry) Meter {
 	if nil == r {
 		r = DefaultRegistry
 	}
-	r.Register(name, c)
+	_ = r.Register(name, c)
 	return c
 }
 

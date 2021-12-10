@@ -23,7 +23,7 @@ func WriteJSON(r Registry, d time.Duration, w io.Writer) {
 // WriteJSONOnce writes metrics from the given registry to the specified
 // io.Writer as JSON.
 func WriteJSONOnce(r Registry, w io.Writer) {
-	json.NewEncoder(w).Encode(r)
+	_ = json.NewEncoder(w).Encode(r)
 }
 
 func (p *PrefixedRegistry) MarshalJSON() ([]byte, error) {

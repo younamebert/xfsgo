@@ -92,7 +92,7 @@ var blake2FMalformedInputTests = []precompiledFailureTest{
 
 func testPrecompiled(addr string, test precompiledTest, t *testing.T) {
 	p := allPrecompiles[common.Hex2Address(addr)]
-	in := common.Hex2Bytes(test.Input)
+	in := common.Hex2bytes(test.Input)
 	gas := p.RequiredGas(in)
 	t.Run(fmt.Sprintf("%s-Gas=%d", test.Name, gas), func(t *testing.T) {
 		if res, _, err := RunPrecompiledContract(p, in, gas); err != nil {
@@ -104,7 +104,7 @@ func testPrecompiled(addr string, test precompiledTest, t *testing.T) {
 			t.Errorf("%v: gas wrong, expected %d, got %d", test.Name, expGas, gas)
 		}
 		// Verify that the precompile did not touch the input buffer
-		exp := common.Hex2Bytes(test.Input)
+		exp := common.Hex2bytes(test.Input)
 		if !bytes.Equal(in, exp) {
 			t.Errorf("Precompiled %v modified input data", addr)
 		}
@@ -113,7 +113,7 @@ func testPrecompiled(addr string, test precompiledTest, t *testing.T) {
 
 func testPrecompiledOOG(addr string, test precompiledTest, t *testing.T) {
 	p := allPrecompiles[common.Hex2Address(addr)]
-	in := common.Hex2Bytes(test.Input)
+	in := common.Hex2bytes(test.Input)
 	gas := p.RequiredGas(in) - 1
 
 	t.Run(fmt.Sprintf("%s-Gas=%d", test.Name, gas), func(t *testing.T) {
@@ -122,7 +122,7 @@ func testPrecompiledOOG(addr string, test precompiledTest, t *testing.T) {
 			t.Errorf("Expected error [out of gas], got [%v]", err)
 		}
 		// Verify that the precompile did not touch the input buffer
-		exp := common.Hex2Bytes(test.Input)
+		exp := common.Hex2bytes(test.Input)
 		if !bytes.Equal(in, exp) {
 			t.Errorf("Precompiled %v modified input data", addr)
 		}
@@ -131,7 +131,7 @@ func testPrecompiledOOG(addr string, test precompiledTest, t *testing.T) {
 
 func testPrecompiledFailure(addr string, test precompiledFailureTest, t *testing.T) {
 	p := allPrecompiles[common.Hex2Address(addr)]
-	in := common.Hex2Bytes(test.Input)
+	in := common.Hex2bytes(test.Input)
 	gas := p.RequiredGas(in)
 	t.Run(test.Name, func(t *testing.T) {
 		_, _, err := RunPrecompiledContract(p, in, gas)
@@ -139,7 +139,7 @@ func testPrecompiledFailure(addr string, test precompiledFailureTest, t *testing
 			t.Errorf("Expected error [%v], got [%v]", test.ExpectedError, err)
 		}
 		// Verify that the precompile did not touch the input buffer
-		exp := common.Hex2Bytes(test.Input)
+		exp := common.Hex2bytes(test.Input)
 		if !bytes.Equal(in, exp) {
 			t.Errorf("Precompiled %v modified input data", addr)
 		}
@@ -151,7 +151,7 @@ func benchmarkPrecompiled(addr string, test precompiledTest, bench *testing.B) {
 		return
 	}
 	p := allPrecompiles[common.Hex2Address(addr)]
-	in := common.Hex2Bytes(test.Input)
+	in := common.Hex2bytes(test.Input)
 	reqGas := p.RequiredGas(in)
 
 	var (

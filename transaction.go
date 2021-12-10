@@ -29,7 +29,6 @@ import (
 	"xfsgo/common"
 	"xfsgo/common/ahash"
 	"xfsgo/crypto"
-	"xfsgo/types"
 
 	"github.com/sirupsen/logrus"
 )
@@ -344,26 +343,24 @@ func SortByPriceAndNonce(txs []*Transaction) {
 //
 // NOTE: In a future PR this will be removed.
 type MessageImp struct {
-	to         common.Address
-	from       common.Address
-	nonce      uint64
-	amount     *big.Int
-	gasLimit   uint64
-	gasPrice   *big.Int
-	data       []byte
-	accessList types.AccessList
+	to       common.Address
+	from     common.Address
+	nonce    uint64
+	amount   *big.Int
+	gasLimit uint64
+	gasPrice *big.Int
+	data     []byte
 }
 
-func NewMessage(from common.Address, to common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, accessList types.AccessList) Message {
+func NewMessage(from common.Address, to common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) MessageImp {
 	return MessageImp{
-		from:       from,
-		to:         to,
-		nonce:      nonce,
-		amount:     amount,
-		gasLimit:   gasLimit,
-		gasPrice:   gasPrice,
-		data:       data,
-		accessList: accessList,
+		from:     from,
+		to:       to,
+		nonce:    nonce,
+		amount:   amount,
+		gasLimit: gasLimit,
+		gasPrice: gasPrice,
+		data:     data,
 	}
 }
 
@@ -386,14 +383,13 @@ func (tx *Transaction) AsMessage() (MessageImp, error) {
 	return msg, err
 }
 
-func (m MessageImp) From() common.Address         { return m.from }
-func (m MessageImp) To() common.Address           { return m.to }
-func (m MessageImp) GasPrice() *big.Int           { return m.gasPrice }
-func (m MessageImp) Value() *big.Int              { return m.amount }
-func (m MessageImp) Gas() uint64                  { return m.gasLimit }
-func (m MessageImp) Nonce() uint64                { return m.nonce }
-func (m MessageImp) Data() []byte                 { return m.data }
-func (m MessageImp) AccessList() types.AccessList { return m.accessList }
+func (m MessageImp) From() common.Address { return m.from }
+func (m MessageImp) To() common.Address   { return m.to }
+func (m MessageImp) GasPrice() *big.Int   { return m.gasPrice }
+func (m MessageImp) Value() *big.Int      { return m.amount }
+func (m MessageImp) Gas() uint64          { return m.gasLimit }
+func (m MessageImp) Nonce() uint64        { return m.nonce }
+func (m MessageImp) Data() []byte         { return m.data }
 
 // copyAddressPtr copies an address.
 func copyAddressPtr(a *common.Address) *common.Address {

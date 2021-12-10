@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"xfsgo/common"
-	"xfsgo/types"
 )
 
 // accessList is an accumulator for the set of accounts and storage slots an EVM
@@ -93,17 +92,17 @@ func (al accessList) equal(other accessList) bool {
 }
 
 // accesslist converts the accesslist to a types.AccessList.
-func (al accessList) accessList() types.AccessList {
-	acl := make(types.AccessList, 0, len(al))
-	for addr, slots := range al {
-		tuple := types.AccessTuple{Address: addr, StorageKeys: []common.Hash{}}
-		for slot := range slots {
-			tuple.StorageKeys = append(tuple.StorageKeys, slot)
-		}
-		acl = append(acl, tuple)
-	}
-	return acl
-}
+// func (al accessList) accessList() types.AccessList {
+// 	acl := make(types.AccessList, 0, len(al))
+// 	for addr, slots := range al {
+// 		tuple := types.AccessTuple{Address: addr, StorageKeys: []common.Hash{}}
+// 		for slot := range slots {
+// 			tuple.StorageKeys = append(tuple.StorageKeys, slot)
+// 		}
+// 		acl = append(acl, tuple)
+// 	}
+// 	return acl
+// }
 
 // AccessListTracer is a tracer that accumulates touched accounts and storage
 // slots into an internal set.
@@ -115,27 +114,27 @@ type AccessListTracer struct {
 // NewAccessListTracer creates a new tracer that can generate AccessLists.
 // An optional AccessList can be specified to occupy slots and addresses in
 // the resulting accesslist.
-func NewAccessListTracer(acl types.AccessList, from, to common.Address, precompiles []common.Address) *AccessListTracer {
-	excl := map[common.Address]struct{}{
-		from: {}, to: {},
-	}
-	for _, addr := range precompiles {
-		excl[addr] = struct{}{}
-	}
-	list := newAccessList()
-	for _, al := range acl {
-		if _, ok := excl[al.Address]; !ok {
-			list.addAddress(al.Address)
-		}
-		for _, slot := range al.StorageKeys {
-			list.addSlot(al.Address, slot)
-		}
-	}
-	return &AccessListTracer{
-		excl: excl,
-		list: list,
-	}
-}
+// func NewAccessListTracer(acl types.AccessList, from, to common.Address, precompiles []common.Address) *AccessListTracer {
+// 	excl := map[common.Address]struct{}{
+// 		from: {}, to: {},
+// 	}
+// 	for _, addr := range precompiles {
+// 		excl[addr] = struct{}{}
+// 	}
+// 	list := newAccessList()
+// 	for _, al := range acl {
+// 		if _, ok := excl[al.Address]; !ok {
+// 			list.addAddress(al.Address)
+// 		}
+// 		for _, slot := range al.StorageKeys {
+// 			list.addSlot(al.Address, slot)
+// 		}
+// 	}
+// 	return &AccessListTracer{
+// 		excl: excl,
+// 		list: list,
+// 	}
+// }
 
 func (a *AccessListTracer) CaptureStart(env *EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
 }
@@ -172,9 +171,9 @@ func (*AccessListTracer) CaptureEnter(typ OpCode, from common.Address, to common
 func (*AccessListTracer) CaptureExit(output []byte, gasUsed uint64, err error) {}
 
 // AccessList returns the current accesslist maintained by the tracer.
-func (a *AccessListTracer) AccessList() types.AccessList {
-	return a.list.accessList()
-}
+// func (a *AccessListTracer) AccessList() types.AccessList {
+// 	return a.list.accessList()
+// }
 
 // Equal returns if the content of two access list traces are equal.
 func (a *AccessListTracer) Equal(other *AccessListTracer) bool {

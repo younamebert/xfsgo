@@ -17,6 +17,7 @@
 package xfsgo
 
 import (
+	"encoding/hex"
 	"math/big"
 	"xfsgo/avlmerkle"
 	"xfsgo/common"
@@ -66,11 +67,11 @@ func (so *StateObj) Decode(data []byte) error {
 			so.nonce = num.Uint64()
 		}
 	}
-	// if extra, ok := r["extra"]; ok {
-	// 	if bs, err := hex.DecodeString(extra); err == nil {
-	// 		so.extra = bs
-	// 	}
-	// }
+	if extra, ok := r["code"]; ok {
+		if bs, err := hex.DecodeString(extra); err == nil {
+			so.code = bs
+		}
+	}
 	return nil
 }
 
@@ -79,7 +80,7 @@ func (so *StateObj) Encode() ([]byte, error) {
 		"address": so.address.String(),
 		"balance": so.balance.Text(10),
 		"nonce":   new(big.Int).SetUint64(so.nonce).Text(10),
-		// "extra":   hex.EncodeToString(so.extra),
+		"code":    hex.EncodeToString(so.code),
 	}
 	enc := common.SortAndEncodeMap(objmap)
 	return []byte(enc), nil
@@ -555,10 +556,6 @@ func (s *StateTree) GetRefund() uint64 {
 
 func (s *StateTree) HasSuicided(common.Address) bool {
 	return true
-}
-
-func (s *StateTree) PrepareAccessList(sender common.Address, dest *common.Address, precompiles []common.Address, txAccesses types.AccessList) {
-
 }
 
 // Snapshot returns an identifier for the current revision of the state.

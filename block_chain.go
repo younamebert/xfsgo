@@ -173,6 +173,10 @@ func (bc *BlockChain) GetNonce(addr common.Address) uint64 {
 	return bc.stateTree.GetNonce(addr)
 }
 
+func (bc *BlockChain) StateAt(rootHash common.Hash) *StateTree {
+	return NewStateTree(bc.stateDB, rootHash.Bytes())
+}
+
 // getBlockByNumber get Block's Info about the Optimum chain
 func (bc *BlockChain) GetBlockByNumber(num uint64) *Block {
 	bc.mu.RLock()
@@ -293,6 +297,13 @@ func (bc *BlockChain) setLastState() error {
 		bc.lastBlockHash = bHeader.HeaderHash()
 	}
 	return nil
+}
+
+func (bc *BlockChain) GetEVM(msg Message, statedb *StateTree, header *BlockHeader) (*vm.EVM, error) {
+	// Create a new context to be used in the EVM environment
+	txContext := NewEVMTxContext(msg)
+	blockContext := NewEVMBlockContext(header, bc, nil)
+	return vm.NewEVM(blockContext, txContext, statedb, bc.vmConfig), nil
 }
 
 // GetBlockReceiptsByBHash get Receipts by blockheader hash

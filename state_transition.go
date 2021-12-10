@@ -19,12 +19,9 @@ package xfsgo
 import (
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"xfsgo/common"
 	"xfsgo/crypto"
-	"xfsgo/params"
-	"xfsgo/types"
 	"xfsgo/xfsvm/vm"
 )
 
@@ -70,7 +67,6 @@ type Message interface {
 	Value() *big.Int
 	Nonce() uint64
 	Data() []byte
-	AccessList() types.AccessList
 }
 
 // ExecutionResult includes all output after executing given evm
@@ -106,47 +102,6 @@ func (result *ExecutionResult) Revert() []byte {
 		return nil
 	}
 	return common.CopyBytes(result.ReturnData)
-}
-
-// IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
-func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation bool, isHomestead, isEIP2028 bool) (uint64, error) {
-	// Set the starting gas for the raw transaction
-	var gas uint64
-	if isContractCreation && isHomestead {
-		gas = params.TxGasContractCreation
-	} else {
-		gas = params.TxGas
-	}
-	// Bump the required gas by the amount of transactional data
-	if len(data) > 0 {
-		// Zero and non-zero bytes are priced differently
-		var nz uint64
-		for _, byt := range data {
-			if byt != 0 {
-				nz++
-			}
-		}
-		// Make sure we don't exceed uint64 for all data combinations
-		nonZeroGas := params.TxDataNonZeroGasFrontier
-		if isEIP2028 {
-			nonZeroGas = params.TxDataNonZeroGasEIP2028
-		}
-		if (math.MaxUint64-gas)/nonZeroGas < nz {
-			return 0, errors.New("gas uint64 overflow")
-		}
-		gas += nz * nonZeroGas
-
-		z := uint64(len(data)) - nz
-		if (math.MaxUint64-gas)/params.TxDataZeroGas < z {
-			return 0, errors.New("gas uint64 overflow")
-		}
-		gas += z * params.TxDataZeroGas
-	}
-	if accessList != nil {
-		gas += uint64(len(accessList)) * params.TxAccessListAddressGas
-		gas += uint64(accessList.StorageKeys()) * params.TxAccessListStorageKeyGas
-	}
-	return gas, nil
 }
 
 // NewStateTransition initialises and returns a new state transition object.
@@ -299,25 +254,23 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
 
 	// Check clauses 1-3, buy gas if everything is correct
-	if err := st.txPreCheck(); err != nil {
-		return nil, err
-	}
+	// if err := st.txPreCheck(); err != nil {
+	// 	return nil, err
+	// }
 	msg := st.msg
 	sender := vm.AccountRef(msg.From())
-	homestead := st.evm.ChainConfig().IsHomestead(st.evm.Context.BlockNumber)
-	istanbul := st.evm.ChainConfig().IsIstanbul(st.evm.Context.BlockNumber)
-	london := st.evm.ChainConfig().IsLondon(st.evm.Context.BlockNumber)
+
 	contractCreation := msg.To() == common.Address{}
 
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
-	gas, err := IntrinsicGas(st.data, st.msg.AccessList(), contractCreation, homestead, istanbul)
-	if err != nil {
-		return nil, err
-	}
-	if st.gas < gas {
-		return nil, fmt.Errorf("%w: have %d, want %d", errors.New("intrinsic gas too low"), st.gas, gas)
-	}
-	st.gas -= gas
+	// gas, err := IntrinsicGas(st.data, st.msg.AccessList(), contractCreation, homestead, istanbul)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if st.gas < gas {
+	// 	return nil, fmt.Errorf("%w: have %d, want %d", errors.New("intrinsic gas too low"), st.gas, gas)
+	// }
+	// st.gas -= gas
 
 	// Check clause 6
 	if msg.Value().Sign() > 0 && !st.evm.Context.CanTransfer(st.state, msg.From(), msg.Value()) {
@@ -332,21 +285,16 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		ret   []byte
 		vmerr error // vm errors do not effect consensus and are therefore not assigned to err
 	)
+
 	if contractCreation {
-		ret, _, st.gas, vmerr = st.evm.Create(sender, st.data, st.gas, st.value)
+		ret, _, st.gas, vmerr = st.evm.Create(sender, st.data, 1000000, st.value)
+
 	} else {
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
-		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
+		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, 1000000, st.value)
 	}
 
-	if !london {
-		// Before EIP-3529: refunds were capped to gasUsed / 2
-		st.refundGas(params.RefundQuotient)
-	} else {
-		// After EIP-3529: refunds are capped to gasUsed / 5
-		st.refundGas(params.RefundQuotientEIP3529)
-	}
 	// effectiveTip := st.gasPrice
 	// if london {
 	// 	effectiveTip = cmath.BigMin(st.gasTipCap, new(big.Int).Sub(st.gasFeeCap, st.evm.Context.BaseFee))
@@ -381,41 +329,28 @@ func applyTransaction(msg MessageImp, bc ChainContext, author *common.Address, g
 	evm.Reset(txContext, statedb)
 
 	// Apply the transaction to the current state (included in the env).
-	_, err := ApplyMessage(evm, msg, gp)
+	result, err := ApplyMessage(evm, msg, gp)
 	if err != nil {
 		return nil, err
 	}
 
-	// Update the state with pending changes.
-	// var root []byte
-	// if config.IsByzantium(blockNumber) {
-	// 	statedb.Finalise(true)
-	// } else {
-	// 	root = statedb.IntermediateRoot(config.IsEIP158(blockNumber)).Bytes()
-	// }
-	// *usedGas += result.UsedGas
+	receipt := &Receipt{}
+	if (msg.To() == common.Address{}) {
+		receipt.ContractAddress = crypto.CreateAddress(evm.TxContext.Origin, tx.Nonce)
+	}
 
-	// // Create a new receipt for the transaction, storing the intermediate root and gas used
-	// // by the tx.
-	// receipt := &types.Receipt{Type: tx.Type(), PostState: root, CumulativeGasUsed: *usedGas}
-	// if result.Failed() {
-	// 	receipt.Status = types.ReceiptStatusFailed
-	// } else {
-	// 	receipt.Status = types.ReceiptStatusSuccessful
-	// }
-	// receipt.TxHash = tx.Hash()
-	// receipt.GasUsed = result.UsedGas
+	*usedGas += result.UsedGas
 
-	// // If the transaction created a contract, store the creation address in the receipt.
-	// if msg.To() == nil {
-	// 	receipt.ContractAddress = crypto.CreateAddress(evm.TxContext.Origin, tx.Nonce())
-	// }
+	// remaining := new(big.Int).Mul(, tx.GasPrice)
+	// sender.AddBalance(remaining)
+	// gp.AddGas(gas)
+	// mgasused := new(big.Int).Sub(tx.GasLimit, gas)
+	statedb.UpdateAll()
+	// totalGas.Add(totalGas, mgasused)
+	receipt.Version = tx.Version
+	receipt.TxHash = tx.Hash()
+	receipt.Status = 1
+	receipt.GasUsed = new(big.Int).SetUint64(*usedGas)
 
-	// // Set the receipt logs and create the bloom filter.
-	// receipt.Logs = statedb.GetLogs(tx.Hash(), blockHash)
-	// receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
-	// receipt.BlockHash = blockHash
-	// receipt.BlockNumber = blockNumber
-	// receipt.TransactionIndex = uint(statedb.TxIndex())
-	return nil, err
+	return receipt, err
 }

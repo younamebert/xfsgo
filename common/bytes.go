@@ -30,7 +30,7 @@ func FromHex(s string) []byte {
 	if len(s)%2 == 1 {
 		s = "0" + s
 	}
-	return Hex2Bytes(s)
+	return Hex2bytes(s)
 }
 
 // CopyBytes returns an exact copy of the provided bytes.
@@ -73,10 +73,10 @@ func Bytes2Hex(d []byte) string {
 }
 
 // Hex2Bytes returns the bytes represented by the hexadecimal string str.
-func Hex2Bytes(str string) []byte {
-	h, _ := hex.DecodeString(str)
-	return h
-}
+// func Hex2Bytes(str string) []byte {
+// 	h, _ := hex.DecodeString(str)
+// 	return h
+// }
 
 // Hex2BytesFixed returns bytes of a specified fixed length flen.
 func Hex2BytesFixed(str string, flen int) []byte {

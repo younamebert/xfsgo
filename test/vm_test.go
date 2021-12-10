@@ -95,6 +95,8 @@ func (cc ChainContext) GetHeader(hash common.Hash, number uint64) *xfsgo.BlockHe
 	}
 }
 
+// code : "0x606060405260818060106000396000f360606040526000357c010000000000000000000000000000000000000000000000000000000090048063165c4a16146039576035565b6002565b34600257605a60048080359060200190919080359060200190919050506070565b6040518082815260200191505060405180910390f35b60008183029050607b565b9291505056"
+// input :"165c4a1600000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000004"
 func TestNewEVMBlockContext(t *testing.T) {
 
 	fmt.Println(fromAddress, toAddress)
@@ -104,7 +106,7 @@ func TestNewEVMBlockContext(t *testing.T) {
 	cc := ChainContext{}
 	ctx := xfsgo.NewEVMBlockContext(cc.GetHeader(testHash, 0), cc, &fromAddress)
 
-	msg := xfsgo.NewMessage(fromAddress, common.Address{}, nonce, amount, 1000, big.NewInt(1), common.Hex2bytes(data), nil)
+	msg := xfsgo.NewMessage(fromAddress, common.Address{}, nonce, amount, 1000, big.NewInt(1), common.Hex2bytes(data))
 	txContext := xfsgo.NewEVMTxContext(msg)
 
 	stateDB := NewMemStorage()
@@ -121,10 +123,10 @@ func TestNewEVMBlockContext(t *testing.T) {
 	evm := vm.NewEVM(ctx, txContext, stateTree, vmConfig)
 	contractRef := vm.AccountRef(fromAddress)
 	fmt.Println(fromAddress, contractRef)
-	contractCode, contractAddr, gasLeftover, err := evm.Create(contractRef, common.Hex2bytes(data), 1000000, big.NewInt(1000000000))
+	contractCode, contractAddr, gasLeftover, err := evm.Create(contractRef, common.Hex2bytes(data), stateTree.GetBalance(fromAddress).Uint64(), big.NewInt(1000000000))
 	fmt.Printf("err:%v\n", err)
 
-	fmt.Printf("contractAddr:%v,gasLeftover:%v\n", contractAddr.Hex(), gasLeftover)
+	fmt.Printf("-------contractAddr:%v,gasLeftover:%v\n", contractAddr.Hex(), gasLeftover)
 	fmt.Printf("code_contractCode:%v\n", contractCode)
 	fmt.Printf("stateTree.GetCode()_contractCode:%v\n", stateTree.GetCode(contractAddr))
 
@@ -133,15 +135,9 @@ func TestNewEVMBlockContext(t *testing.T) {
 	fmt.Printf("after create contract, Balance=%v,contractAddrBal=%v\n", testBalance, contractAddrBal)
 
 	abiObj := loadAbi(abiFileName)
-	input, err := abiObj.Pack("multiply", big.NewInt(1), big.NewInt(2))
-	must(err)
-	outputs, gasLeftover, vmerr := evm.Call(contractRef, contractAddr, input, stateTree.GetBalance(fromAddress).Uint64(), big.NewInt(0))
-	must(vmerr)
-
-	fmt.Printf("call outputs %v\n", outputs)
-	fmt.Printf("call gasLeftover %v\n", gasLeftover)
 
 	input1, err1 := abiObj.Pack("multiply", big.NewInt(3), big.NewInt(4))
+	fmt.Println(common.Bytes2Hex(input1))
 	must(err1)
 	outputs1, gasLeftover1, vmerr1 := evm.Call(contractRef, contractAddr, input1, stateTree.GetBalance(fromAddress).Uint64(), big.NewInt(0))
 	must(vmerr1)

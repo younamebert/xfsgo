@@ -340,13 +340,7 @@ func applyTransaction(msg MessageImp, bc ChainContext, author *common.Address, g
 	}
 
 	*usedGas += result.UsedGas
-
-	// remaining := new(big.Int).Mul(, tx.GasPrice)
-	// sender.AddBalance(remaining)
-	// gp.AddGas(gas)
-	// mgasused := new(big.Int).Sub(tx.GasLimit, gas)
 	statedb.UpdateAll()
-	// totalGas.Add(totalGas, mgasused)
 	receipt.Version = tx.Version
 	receipt.TxHash = tx.Hash()
 	receipt.Status = 1

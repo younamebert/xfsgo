@@ -26,6 +26,7 @@ import (
 
 var (
 	fromAddr      string
+	toAddr        string
 	gasLimit      string
 	gasPrice      string
 	nonce         string
@@ -158,6 +159,10 @@ func contract(cmd *cobra.Command, args []string) error {
 
 	if fromAddr != "" {
 		req.From = fromAddr
+	}
+
+	if toAddr != "" {
+		req.To = toAddr
 	}
 	if gasLimit != "" {
 		req.GasLimit = gasLimit
@@ -347,12 +352,20 @@ func init() {
 	walletCommand.AddCommand(walletExportCommand)
 	walletCommand.AddCommand(walletGetAddrDefCommand)
 	walletCommand.AddCommand(walletTransferCommand)
-	walletCommand.AddCommand(walletContractCommand)
+
 	mFlags := walletTransferCommand.PersistentFlags()
 	mFlags.StringVarP(&fromAddr, "address", "a", "", "Set from address")
 	mFlags.StringVarP(&gasPrice, "gasprice", "", "", "Set transaction gas price")
 	mFlags.StringVarP(&gasLimit, "gaslimit", "", "", "Set transaction gas limit")
 	mFlags.StringVarP(&nonce, "nonce", "", "", "Set transaction nonce")
+
+	walletCommand.AddCommand(walletContractCommand)
+	mContractFlags := walletContractCommand.PersistentFlags()
+	mContractFlags.StringVarP(&fromAddr, "fromaddress", "a", "", "Set from address")
+	mContractFlags.StringVarP(&toAddr, "toaddress", "t", "", "Set to address")
+	mContractFlags.StringVarP(&gasPrice, "gasprice", "", "", "Set transaction gas price")
+	mContractFlags.StringVarP(&gasLimit, "gaslimit", "", "", "Set transaction gas limit")
+	mContractFlags.StringVarP(&nonce, "nonce", "", "", "Set transaction nonce")
 	walletCommand.AddCommand(walletSetAddrDefCommand)
 	rootCmd.AddCommand(walletCommand)
 }

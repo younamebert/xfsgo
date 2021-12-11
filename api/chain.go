@@ -224,6 +224,15 @@ func (handler *ChainAPIHandler) GetReceiptByHash(args GetReceiptByHashArgs, resp
 	if err := common.HashCalibrator(args.Hash); err != nil {
 		return xfsgo.NewRPCErrorCause(-32001, err)
 	}
+
+	var from common.Address
+	var to common.Address
+	tx := handler.BlockChain.GetTransactionByTxHash(common.Hex2Hash(args.Hash))
+	if tx != nil {
+		from, _ = tx.FromAddr()
+		to = tx.To
+	}
+
 	dataReceipt := handler.BlockChain.GetReceiptByHash(common.Hex2Hash(args.Hash))
 	if dataReceipt == nil {
 		return xfsgo.NewRPCError(-1006, "Not found")
@@ -233,13 +242,16 @@ func (handler *ChainAPIHandler) GetReceiptByHash(args GetReceiptByHashArgs, resp
 		return xfsgo.NewRPCError(-1006, "Not found")
 	}
 	data := &ReceiptResp{
-		Version:    dataReceipt.Version,
-		Status:     dataReceipt.Status,
-		TxHash:     dataReceipt.TxHash,
-		GasUsed:    dataReceipt.GasUsed,
-		BlockHash:  dataReceiptIndex.BlockHash,
-		BlockIndex: dataReceiptIndex.BlockIndex,
-		TxIndex:    dataReceiptIndex.Index,
+		Version:         dataReceipt.Version,
+		Status:          dataReceipt.Status,
+		TxHash:          dataReceipt.TxHash,
+		ContractAddress: dataReceipt.ContractAddress,
+		GasUsed:         dataReceipt.GasUsed,
+		From:            from,
+		To:              to,
+		BlockHash:       dataReceiptIndex.BlockHash,
+		BlockIndex:      dataReceiptIndex.BlockIndex,
+		TxIndex:         dataReceiptIndex.Index,
 	}
 
 	return coverReceipt(data, resp)

@@ -726,9 +726,11 @@ func (mgr *syncMgr) txBroadcastLoop() {
 	}
 }
 func (mgr *syncMgr) BroadcastTx(txs RemoteTxs) {
+	mHeader := mgr.chain.CurrentBHeader()
+	mHeight := mHeader.Height
 	for _, p := range mgr.peers.peerList() {
 		pid := p.ID()
-		if p.Height() < p.Height() {
+		if p.Height() < mHeight {
 			continue
 		}
 		logrus.Debugf("BroadcastTx Add tx %x, %d", pid[len(pid)-4:], len(txs))

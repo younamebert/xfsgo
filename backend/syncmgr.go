@@ -167,6 +167,7 @@ func (mgr *syncMgr) handleNewBlock(p discover.NodeId, block *RemoteBlock) error 
 		mgr.peers.setHead(p, blockHash)
 		go mgr.Synchronise(pn)
 	}
+	pn.AddBlock(block.Header.Hash)
 	go mgr.BroadcastBlock(block)
 	return nil
 }
@@ -707,6 +708,9 @@ func (mgr *syncMgr) txSyncLoop() {
 
 func (mgr *syncMgr) BroadcastBlock(block *RemoteBlock) {
 	for _, p := range mgr.peers.peerList() {
+		if p.HasBlock(block.Header.Hash) {
+			continue
+		}
 		if err := p.SendNewBlock(block); err != nil {
 			continue
 		}

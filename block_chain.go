@@ -25,7 +25,7 @@ import (
 	"time"
 	"xfsgo/common"
 	"xfsgo/storage/badger"
-	"xfsgo/vm/simplevm"
+	"xfsgo/vm"
 
 	"github.com/sirupsen/logrus"
 )
@@ -949,8 +949,8 @@ func (bc *BlockChain) ApplyTransactionN(
 		return nil, err
 	}
 	if TxToAddrNotSet(tx) {
-		vm := simplevm.New(sender)
-		if err = vm.Exec(tx.Data); err == nil {
+		mVm := vm.NewXVM()
+		if err = mVm.Create(sender.address, tx.Data); err == nil {
 			status = 1
 			sender.SetData()
 		}
@@ -1001,8 +1001,8 @@ func (bc *BlockChain) ApplyTransaction(
 		return nil, err
 	}
 	if TxToAddrNotSet(tx) {
-		vm := simplevm.New(sender)
-		if err = vm.Exec(tx.Data); err == nil {
+		mVm := vm.NewXVM()
+		if err = mVm.Create(sender.address, tx.Data); err == nil {
 			status = 1
 			sender.SetData()
 		}

@@ -167,6 +167,7 @@ func (mgr *syncMgr) handleNewBlock(p discover.NodeId, block *RemoteBlock) error 
 		mgr.peers.setHead(p, blockHash)
 		go mgr.Synchronise(pn)
 	}
+	go mgr.BroadcastBlock(block)
 	return nil
 }
 

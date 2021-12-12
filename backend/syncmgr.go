@@ -728,6 +728,9 @@ func (mgr *syncMgr) txBroadcastLoop() {
 func (mgr *syncMgr) BroadcastTx(txs RemoteTxs) {
 	for _, p := range mgr.peers.peerList() {
 		pid := p.ID()
+		if p.Height() < p.Height() {
+			continue
+		}
 		logrus.Debugf("BroadcastTx Add tx %x, %d", pid[len(pid)-4:], len(txs))
 		if err := p.SendTransactions(txs); err != nil {
 			continue

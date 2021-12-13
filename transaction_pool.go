@@ -19,6 +19,7 @@ package xfsgo
 import (
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"math/big"
 	"sort"
 	"sync"
@@ -112,6 +113,7 @@ func (pool *TxPool) validateTx(tx *Transaction) error {
 	if from, err = tx.FromAddr(); err != nil {
 		return invalidSenderErr
 	}
+	logrus.Debugf("Validation transaction: hash=%x, from=%s", tx.Hash(), from.B58String())
 	if !pool.currentState().HashAccount(from) {
 		return balanceErr
 	}

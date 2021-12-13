@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"math/big"
 	"strconv"
 	"xfsgo"
@@ -120,6 +121,7 @@ func (tx *TxPoolHandler) SendRawTransaction(args RawTransactionArgs, resp *strin
 	if err := json.Unmarshal(databytes, rawtx); err != nil {
 		return xfsgo.NewRPCErrorCause(-32001, fmt.Errorf("failed to parse data: %s", err))
 	}
+	logrus.Debugf("Successfully parse transaction json data: %s", string(databytes))
 	txdata, err := CoverTransaction(rawtx)
 	if err != nil {
 		return xfsgo.NewRPCErrorCause(-32001, err)

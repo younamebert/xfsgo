@@ -25,7 +25,7 @@ import (
 	"xfsgo/crypto"
 	"xfsgo/params"
 	"xfsgo/test"
-	"xfsgo/xfsvm/vm"
+	"xfsgo/vm"
 
 	"xfsgo/common"
 )

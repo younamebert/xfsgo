@@ -22,7 +22,7 @@ import (
 	"math/big"
 	"xfsgo/common"
 	"xfsgo/crypto"
-	"xfsgo/xfsvm/vm"
+	"xfsgo/vm"
 )
 
 var emptyCodeHash = crypto.Keccak256Hash(nil)

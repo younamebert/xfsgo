@@ -176,16 +176,6 @@ func (t *Transaction) Hash() common.Hash {
 	return common.Bytes2Hash(ahash.SHA256([]byte(enc)))
 }
 
-func (t *Transaction) clone() *Transaction {
-	p := *t
-	return &p
-}
-func (t *Transaction) copyTrim() *Transaction {
-	nt := t.clone()
-	nt.Signature = nil
-	return nt
-}
-
 func sortAndEncodeMap(data map[string]string) string {
 	mapkeys := make([]string, 0)
 	for k := range data {
@@ -390,12 +380,3 @@ func (m MessageImp) Value() *big.Int      { return m.amount }
 func (m MessageImp) Gas() uint64          { return m.gasLimit }
 func (m MessageImp) Nonce() uint64        { return m.nonce }
 func (m MessageImp) Data() []byte         { return m.data }
-
-// copyAddressPtr copies an address.
-func copyAddressPtr(a *common.Address) *common.Address {
-	if a == nil {
-		return nil
-	}
-	cpy := *a
-	return &cpy
-}

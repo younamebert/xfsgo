@@ -26,7 +26,7 @@ import (
 	"xfsgo/common"
 	"xfsgo/params"
 	"xfsgo/storage/badger"
-	"xfsgo/xfsvm/vm"
+	"xfsgo/vm"
 
 	"github.com/sirupsen/logrus"
 )

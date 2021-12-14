@@ -19,7 +19,7 @@ package xfsgo
 import (
 	"math/big"
 	"xfsgo/common"
-	"xfsgo/xfsvm/vm"
+	"xfsgo/vm"
 )
 
 // ChainContext supports retrieving headers and consensus parameters from the

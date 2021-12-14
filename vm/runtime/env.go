@@ -18,7 +18,7 @@ package runtime
 
 import (
 	"xfsgo"
-	"xfsgo/xfsvm/vm"
+	"xfsgo/vm"
 )
 
 func NewEnv(cfg *Config) *vm.EVM {

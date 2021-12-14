@@ -53,6 +53,8 @@ type syncpeer interface {
 	HasIgnoreHash(hash common.Hash) bool
 	HasBlock(common.Hash) bool
 	AddBlock(common.Hash)
+	AddTx(common.Hash)
+	HasTx(common.Hash) bool
 	Reset()
 }
 
@@ -66,6 +68,8 @@ type peer struct {
 	ignoreHashes    map[common.Hash]struct{}
 	knownBlocksLock sync.RWMutex
 	knownBlocks     map[common.Hash]struct{}
+	knownTxsLock    sync.RWMutex
+	knownTxs        map[common.Hash]struct{}
 }
 
 const (
@@ -91,6 +95,7 @@ func newPeer(p p2p.Peer, version uint32, network uint32) *peer {
 		network:      network,
 		ignoreHashes: make(map[common.Hash]struct{}),
 		knownBlocks:  make(map[common.Hash]struct{}),
+		knownTxs:     make(map[common.Hash]struct{}),
 	}
 	return pt
 }
@@ -102,6 +107,16 @@ func (p *peer) HasBlock(hash common.Hash) (r bool) {
 }
 func (p *peer) AddBlock(hash common.Hash) {
 	p.addKnownBlock(hash)
+}
+
+func (p *peer) HasTx(hash common.Hash) (r bool) {
+	p.knownTxsLock.RLock()
+	defer p.knownTxsLock.RUnlock()
+	_, r = p.knownTxs[hash]
+	return
+}
+func (p *peer) AddTx(hash common.Hash) {
+	p.addKnownTx(hash)
 }
 func (p *peer) GetProtocolMsgCh() (chan p2p.MessageReader, error) {
 	return p.p2pPeer.GetProtocolMsgCh()
@@ -373,6 +388,13 @@ func (p *peer) addKnownBlock(hash common.Hash) {
 		p.knownBlocks[hash] = struct{}{}
 	}
 }
+func (p *peer) addKnownTx(hash common.Hash) {
+	p.knownTxsLock.Lock()
+	defer p.knownTxsLock.Unlock()
+	if _, exists := p.knownTxs[hash]; !exists {
+		p.knownTxs[hash] = struct{}{}
+	}
+}
 
 // SendNewBlock sends a new block
 func (p *peer) SendNewBlock(data *RemoteBlock) error {
@@ -385,12 +407,14 @@ func (p *peer) SendNewBlock(data *RemoteBlock) error {
 
 // SendTransactions sends a batch of transactions
 func (p *peer) SendTransactions(data RemoteTxs) error {
+	for _, tx := range data {
+		p.addKnownTx(tx.Hash)
+	}
 	if err := p2p.SendMsgData(p.p2pPeer, TxMsg, &data); err != nil {
 		return err
 	}
 	return nil
 }
-
 func (p *peer) SendTxhash(data TxHashs) error {
 	if err := p2p.SendMsgData(p.p2pPeer, GetReceipts, &data); err != nil {
 		return err

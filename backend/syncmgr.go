@@ -127,8 +127,13 @@ func (mgr *syncMgr) onNewPeer(p2ppeer p2p.Peer) error {
 	p := newPeer(p2ppeer, mgr.version, mgr.network)
 	return mgr.handlePeer(p)
 }
-func (mgr *syncMgr) handleTransactions(_ discover.NodeId, txs RemoteTxs) error {
+func (mgr *syncMgr) handleTransactions(p discover.NodeId, txs RemoteTxs) error {
+	pn := mgr.peers.get(p)
+	if pn == nil {
+		return errUnKnowPeer
+	}
 	for _, tx := range txs {
+		pn.AddTx(tx.Hash)
 		var targetTx *xfsgo.Transaction
 		_ = common.Objcopy(tx, &targetTx)
 		if err := mgr.txPool.Add(targetTx); err != nil {
@@ -726,20 +731,21 @@ func (mgr *syncMgr) txBroadcastLoop() {
 			event := e.(xfsgo.TxPreEvent)
 			tx := event.Tx
 			rmtx := coverTx2RemoteTx(tx)
-			mgr.BroadcastTx([]*RemoteBlockTx{rmtx})
+			mgr.BroadcastTx(rmtx)
 		}
 	}
 }
-func (mgr *syncMgr) BroadcastTx(txs RemoteTxs) {
+func (mgr *syncMgr) BroadcastTx(tx *RemoteBlockTx) {
 	mHeader := mgr.chain.CurrentBHeader()
 	mHeight := mHeader.Height
 	for _, p := range mgr.peers.peerList() {
-		pid := p.ID()
 		if p.Height() < mHeight {
 			continue
 		}
-		logrus.Debugf("BroadcastTx Add tx %x, %d", pid[len(pid)-4:], len(txs))
-		if err := p.SendTransactions(txs); err != nil {
+		if p.HasTx(tx.Hash) {
+			continue
+		}
+		if err := p.SendTransactions(RemoteTxs{tx}); err != nil {
 			continue
 		}
 	}

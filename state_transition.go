@@ -19,9 +19,11 @@ package xfsgo
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"xfsgo/common"
 	"xfsgo/crypto"
+	"xfsgo/params"
 	"xfsgo/vm"
 )
 
@@ -104,6 +106,41 @@ func (result *ExecutionResult) Revert() []byte {
 	return common.CopyBytes(result.ReturnData)
 }
 
+// IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
+func IntrinsicGas(data []byte, isContractCreation bool) (uint64, error) {
+	// Set the starting gas for the raw transaction
+	var gas uint64
+	if isContractCreation {
+		gas = common.TxGasContractCreation
+	} else {
+		gas = common.TxGas.Uint64()
+	}
+	// Bump the required gas by the amount of transactional data
+	if len(data) > 0 {
+		// Zero and non-zero bytes are priced differently
+		var nz uint64
+		for _, byt := range data {
+			if byt != 0 {
+				nz++
+			}
+		}
+		// Make sure we don't exceed uint64 for all data combinations
+		nonZeroGas := params.TxDataNonZeroGasFrontier
+		if (math.MaxUint64-gas)/nonZeroGas < nz {
+			return 0, errors.New("gas uint64 overflow")
+		}
+		gas += nz * nonZeroGas
+
+		z := uint64(len(data)) - nz
+		if (math.MaxUint64-gas)/params.TxDataZeroGas < z {
+			return 0, errors.New("gas uint64 overflow")
+		}
+		gas += z * params.TxDataZeroGas
+	}
+
+	return gas, nil
+}
+
 // NewStateTransition initialises and returns a new state transition object.
 func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition {
 	return &StateTransition{
@@ -136,62 +173,26 @@ func (st *StateTransition) to() common.Address {
 	return st.msg.To()
 }
 
-// func txPreCheck(stateTree *StateTree, tx *Transaction, gp *GasPool, gas *big.Int) (*StateObj, error) {
-// 	fromaddr, err := tx.FromAddr()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	sender := stateTree.GetOrNewStateObj(fromaddr)
-// 	if sender.GetNonce() != tx.Nonce {
-// 		return sender, fmt.Errorf("nonce err: want=%d, got=%d", sender.GetNonce(), tx.Nonce)
-// 	}
-// 	if err = buyGas(sender, tx, gp, gas); err != nil {
-// 		return sender, err
-// 	}
-// 	return sender, nil
-// }
-
-// func useGas(gas, amount *big.Int) error {
-// 	if gas.Cmp(amount) < 0 {
-// 		return errors.New("out of gas")
-// 	}
-// 	gas.Sub(gas, amount)
-// 	return nil
-// }
-
-// func buyGas(sender *StateObj, tx *Transaction, gp *GasPool, gas *big.Int) error {
-// 	mgval := new(big.Int).Mul(tx.GasPrice, tx.GasLimit)
-// 	if sender.GetBalance().Cmp(mgval) < 0 {
-// 		return fmt.Errorf("per-buy gas err, balance is not enough")
-// 	}
-// 	if err := gp.SubGas(tx.GasLimit); err != nil {
-// 		//logrus.Warnf("gas limit out: %s, gp=%s", tx.GasLimit, gp)
-// 		return err
-// 	}
-// 	gas.Add(gas, tx.GasLimit)
-// 	sender.SubBalance(mgval)
-// 	return nil
-// }
-
 func (st *StateTransition) buyGas() error {
-	// mgval := new(big.Int).SetUint64(st.msg.Gas())
-	// mgval = mgval.Mul(mgval, st.gasPrice)
-	// balanceCheck := mgval
-	// if st.gasFeeCap != nil {
-	// 	balanceCheck = new(big.Int).SetUint64(st.msg.Gas())
-	// 	balanceCheck = balanceCheck.Mul(balanceCheck, st.gasFeeCap)
-	// 	balanceCheck.Add(balanceCheck, st.value)
-	// }
-	// if have, want := st.state.GetBalance(st.msg.From()), balanceCheck; have.Cmp(want) < 0 {
-	// 	return fmt.Errorf("%w: address %v have %v want %v", ErrInsufficientFunds, st.msg.From().Hex(), have, want)
-	// }
-	// if err := st.gp.SubGas(st.msg.Gas()); err != nil {
-	// 	return err
-	// }
-	// st.gas += st.msg.Gas()
+	mgval := new(big.Int).SetUint64(st.msg.Gas())
+	mgval = mgval.Mul(mgval, st.gasPrice)
+	balanceCheck := mgval
+	if st.gasFeeCap != nil {
+		balanceCheck = new(big.Int).SetUint64(st.msg.Gas())
+		balanceCheck = balanceCheck.Mul(balanceCheck, st.gasFeeCap)
+		balanceCheck.Add(balanceCheck, st.value)
+	}
+	if have, want := st.state.GetBalance(st.msg.From()), balanceCheck; have.Cmp(want) < 0 {
+		fromAddr := st.msg.From()
+		return fmt.Errorf("%v: address %v have %v want %v", "insufficient funds for gas * price + value", fromAddr.Hex(), have, want)
+	}
+	if err := st.gp.SubGas(new(big.Int).SetUint64(st.msg.Gas())); err != nil {
+		return err
+	}
+	st.gas += st.msg.Gas()
 
-	// st.initialGas = st.msg.Gas()
-	// st.state.SubBalance(st.msg.From(), mgval)
+	st.initialGas = st.msg.Gas()
+	st.state.SubBalance(st.msg.From(), mgval)
 	return nil
 }
 
@@ -254,23 +255,23 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
 
 	// Check clauses 1-3, buy gas if everything is correct
-	// if err := st.txPreCheck(); err != nil {
-	// 	return nil, err
-	// }
+	if err := st.txPreCheck(); err != nil {
+		return nil, err
+	}
 	msg := st.msg
 	sender := vm.AccountRef(msg.From())
 
 	contractCreation := msg.To() == common.Address{}
 
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
-	// gas, err := IntrinsicGas(st.data, st.msg.AccessList(), contractCreation, homestead, istanbul)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// if st.gas < gas {
-	// 	return nil, fmt.Errorf("%w: have %d, want %d", errors.New("intrinsic gas too low"), st.gas, gas)
-	// }
-	// st.gas -= gas
+	gas, err := IntrinsicGas(st.data, contractCreation)
+	if err != nil {
+		return nil, err
+	}
+	if st.gas < gas {
+		return nil, fmt.Errorf("%w: have %d, want %d", errors.New("intrinsic gas too low"), st.gas, gas)
+	}
+	st.gas -= gas
 
 	// Check clause 6
 	if msg.Value().Sign() > 0 && !st.evm.Context.CanTransfer(st.state, msg.From(), msg.Value()) {
@@ -295,11 +296,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, 1000000, st.value)
 	}
 
-	// effectiveTip := st.gasPrice
-	// if london {
-	// 	effectiveTip = cmath.BigMin(st.gasTipCap, new(big.Int).Sub(st.gasFeeCap, st.evm.Context.BaseFee))
-	// }
-	// st.state.AddBalance(st.evm.Context.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), effectiveTip))
+	st.state.AddBalance(st.evm.Context.Coinbase, new(big.Int).SetUint64(st.gasUsed()))
 
 	return &ExecutionResult{
 		UsedGas:    st.gasUsed(),

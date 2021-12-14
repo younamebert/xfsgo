@@ -36,15 +36,6 @@ func NewEVMBlockContext(header *BlockHeader, chain ChainContext, author *common.
 		baseFee     *big.Int
 	)
 
-	// If we don't have an explicit author (i.e. not mining), extract from the header
-	// if author == nil {
-	// 	beneficiary, _ = chain.Engine().Author(header) // Ignore error, we're past header validation
-	// } else {
-	// 	beneficiary = *author
-	// }
-	// if header.BaseFee != nil {
-	// 	baseFee = new(big.Int).Set(header.BaseFee)
-	// }
 	return vm.BlockContext{
 		CanTransfer: CanTransfer,
 		Transfer:    Transfer,

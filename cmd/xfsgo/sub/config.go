@@ -159,12 +159,18 @@ func defaultBootstrapNodes(netid uint32) []string {
 	if netid == 2 {
 		// test net boot nodes
 		return []string{
-			"xfsnode://139.180.144.201:9011/?id=cc9909b58894a42e1f9d7ceef163b6d4271146e4aa3a2c6a22e2ef9850ad38253c1fa117897c7ed1554492421fc59ae4fb73d163318dd9193bed5efcc7bce75a",
-			"xfsnode://45.63.126.195:9011/?id=66fe5febed75340c88ab00df0c7760e1682b48471d25b3e160eb140cb173422cc4d6dba2921e07d5826d880ede01ecbea32ec4dcc7fb5e7ff16cc34967583319",
-			"xfsnode://119.28.26.67:9011/?id=61d6c98ad5c63db081734667d20dc8de4c6050d2e1ca01b28caa55d0717e5dac07b2b07fe1bcdd15bcf223e2c7146362713baaff5afb96f405d7734ef3977b68",
-			"xfsnode://78.141.192.47:9011/?id=aeb058ca7936d66a59834205e2ef559b14aa37c14578abd8ecc8e64d2d1e58d134dee828814ca1a52101285caa94eb949b185cdd6d8d936e8f41a0beca00845f",
-			"xfsnode://45.32.88.212:9011/?id=031fb41343d89c27ffe48bc834c39e3f6d9452435da40091893f5594b674104cb0e9e76bb6f2ec73e28bcfebd5ae80fa46622d81b2bc092e1800cc5f42ea72e1",
-			"xfsnode://45.32.243.66:9011/?id=d7ad667628482d1dc611860b2b952f6433c90a2ae110f62b96ed439f13c6ae6c8c9ff1ab2c2e5972c75c6849b4d2ce085ce837e4d5e4da77441abf4ece5a28d6",
+			// SG
+			"xfsnode://139.180.144.201:9011/?id=f477a4ad00870704fec42af8c056e5f8e799caa1b40c3b50a6e7137a2ece33d03a0a386f19a8fc80f1023455f640c20a903f1c154adecae312c92a072e9d0fc5",
+			// JP
+			"xfsnode://45.63.126.195:9011/?id=4b2c14c672f8df9fa61d69d7c3f1e2a6334f18a22674d7c66cb1e3adae7a76c4933953970e8e9840734cdb6f9b2a639fd0e79eada381443345e668e45d89f95d",
+			// CN
+			"xfsnode://119.28.26.67:9011/?id=8c729a1ee6ce899aa42ffd7a03c18e094a4c570f2cfd600ac7310670e0f561e7a1d92980306762c13ea26aba799a42b84626428a778e6a92b5f6b8d36d4099cb",
+			// UK
+			"xfsnode://78.141.192.47:9011/?id=d4333425281b943a666ce1ae91c3e39d45ea1b7f5f25f62d18e5f9b9cfb1380448d5db9a486ce7242c78795274853712e8360fb02ef89a344f5a5155c3e9f056",
+			// US
+			"xfsnode://45.32.88.212:9011/?id=8d5e80c4d9d57b7594a465e5b9fbba0c983b40574d8110fc6a50f573e2d78214f8672cd8acf202b14f9b2a6175bb8800eebfd064e243dd81c3571bf56a17171d",
+			// AS
+			"xfsnode://45.32.243.66:9011/?id=642816f6b1488ca77487a7d9ced3001be3c862efef6f7fc2be0e64cf13f842f3ff936643f5d1b29efd2048870d6609757393f514aa0d0db0004de0630760ecb6",
 		}
 	}
 	return make([]string, 0)
@@ -216,12 +222,14 @@ func parseConfigBackendParams(v *viper.Viper) backend.Params {
 	if config.NetworkID == 0 {
 		config.NetworkID = defaultNetworkId
 	}
+	config.GenesisFile = v.GetString("protocol.genesisfile")
 	return config
 }
 
 func parseDaemonConfig(configFilePath string) (daemonConfig, error) {
 	config := viper.New()
-	if err := readFromConfigPath(config, configFilePath); err != nil {
+	if err := readFromConfigPath(config, configFilePath); err != nil && configFilePath != "" {
+		return daemonConfig{}, err
 	}
 	mStorageParams := parseConfigStorageParams(config)
 	mBackendParams := parseConfigBackendParams(config)
@@ -238,7 +246,8 @@ func parseDaemonConfig(configFilePath string) (daemonConfig, error) {
 
 func parseClientConfig(configFilePath string) (clientConfig, error) {
 	config := viper.New()
-	if err := readFromConfigPath(config, configFilePath); err != nil {
+	if err := readFromConfigPath(config, configFilePath); err != nil && configFilePath != "" {
+		return clientConfig{}, err
 	}
 	mRpcClientApiHost := config.GetString("rpclient.apihost")
 	if rpchost == "" {

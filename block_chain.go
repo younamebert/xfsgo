@@ -25,7 +25,7 @@ import (
 	"time"
 	"xfsgo/common"
 	"xfsgo/storage/badger"
-	"xfsgo/vm/simplevm"
+	"xfsgo/vm"
 
 	"github.com/sirupsen/logrus"
 )
@@ -39,7 +39,7 @@ const (
 	maxOrphanBlocks    = 100
 	targetTimePerBlock = int64(time.Minute * 3 / time.Second)
 	targetTimespan     = int64(time.Hour * 42 / time.Second)
-	endTimeV1          = int64(time.Hour * 336 / time.Second)
+	endTimeV2          = int64(time.Hour * 1008 / time.Second)
 	//targetTimePerBlock = int64(time.Minute * 1 / time.Second)
 	//targetTimespan  = int64(time.Minute * 10 / time.Second)
 	//endTimeV1 = int64(time.Minute * 10 / time.Second)
@@ -949,8 +949,8 @@ func (bc *BlockChain) ApplyTransactionN(
 		return nil, err
 	}
 	if TxToAddrNotSet(tx) {
-		vm := simplevm.New(sender)
-		if err = vm.Exec(tx.Data); err == nil {
+		mVm := vm.NewXVM()
+		if err = mVm.Create(sender.address, tx.Data); err == nil {
 			status = 1
 			sender.SetData()
 		}
@@ -1001,8 +1001,8 @@ func (bc *BlockChain) ApplyTransaction(
 		return nil, err
 	}
 	if TxToAddrNotSet(tx) {
-		vm := simplevm.New(sender)
-		if err = vm.Exec(tx.Data); err == nil {
+		mVm := vm.NewXVM()
+		if err = mVm.Create(sender.address, tx.Data); err == nil {
 			status = 1
 			sender.SetData()
 		}
@@ -1115,7 +1115,7 @@ func (bc *BlockChain) findAncestor(bHeader *BlockHeader, height uint64) *BlockHe
 }
 func (bc *BlockChain) calcNextRequiredBitsByHeight(height uint64) (uint32, error) {
 	if height > 1 && GenesisBits == TestNetGenesisBits {
-		totalblocks := endTimeV1 / targetTimePerBlock
+		totalblocks := endTimeV2 / targetTimePerBlock
 		//logrus.Infof("total: %d, end: %d, pre: %d, height: %d", totalblocks, endTimeV1, targetTimePerBlock, int64(height))
 		if int64(height) >= totalblocks {
 			return 0, ErrDifficultyOverflow

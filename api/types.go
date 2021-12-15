@@ -242,7 +242,7 @@ func coverState2Resp(state *xfsgo.StateObj, dst **StateObjResp) error {
 		return nil
 	}
 	result := new(StateObjResp)
-	statehex := hex.EncodeToString(state.GetData())
+	statehex := hex.EncodeToString(state.GetExtra())
 	if statehex != "" {
 		result.ExtraHex = "0x" + statehex
 	}

@@ -77,7 +77,7 @@ func (so *StateObj) Decode(data []byte) error {
 		so.extra = bs
 	}
 	if bs, ok := loadBytesByMapKey(r, "code"); ok {
-		so.extra = bs
+		so.code = bs
 	}
 	if bs, ok := loadBytesByMapKey(r, "state_root"); ok {
 		so.stateRoot = common.Bytes2Hash(bs)
@@ -87,13 +87,12 @@ func (so *StateObj) Decode(data []byte) error {
 
 func (so *StateObj) Encode() ([]byte, error) {
 	objmap := map[string]string{
-		"address":    so.address.String(),
-		"balance":    so.balance.Text(10),
-		"nonce":      new(big.Int).SetUint64(so.nonce).Text(10),
-		"extra":      hex.EncodeToString(so.extra),
-		"code":       hex.EncodeToString(so.code),
-		"state_root": hex.EncodeToString(so.stateRoot[:]),
+		"address": so.address.String(),
+		"balance": so.balance.Text(10),
+		"nonce":   new(big.Int).SetUint64(so.nonce).Text(10),
+		"extra":   hex.EncodeToString(so.extra),
 	}
+
 	enc := common.SortAndEncodeMap(objmap)
 	return []byte(enc), nil
 }
@@ -172,6 +171,9 @@ func (so *StateObj) SubNonce(nonce uint64) {
 }
 func (so *StateObj) GetNonce() uint64 {
 	return so.nonce
+}
+func (so *StateObj) GetExtra() []byte {
+	return so.extra
 }
 func (so *StateObj) SetState(key [32]byte, value []byte) {
 	so.cacheStorage[key] = value

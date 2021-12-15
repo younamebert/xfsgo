@@ -586,6 +586,12 @@ func calcBlockSubsidy(height uint64) *big.Int {
 // AccumulateRewards calculates the rewards and add it to the miner's account.
 func AccumulateRewards(stateTree *StateTree, header *BlockHeader) {
 	subsidy := calcBlockSubsidy(header.Height)
+
+	if header.GasUsed.Cmp(big.NewInt(0)) > 0 {
+		gas := common.NanoCoin2Atto(header.GasUsed)
+		subsidy.Add(subsidy, gas)
+	}
+
 	//logrus.Debugf("Current height of the blockchain %d, reward: %d", header.Height, subsidy)
 	stateTree.AddBalance(header.Coinbase, subsidy)
 }
@@ -1019,6 +1025,7 @@ func (bc *BlockChain) ApplyTransaction(
 
 	// refundGas
 	remaining := new(big.Int).Mul(gas, tx.GasPrice)
+	// fmt.Printf("remaining:%v\n", remaining.String())
 	sender.AddBalance(remaining)
 	gp.AddGas(gas)
 	mgasused := new(big.Int).Sub(tx.GasLimit, gas)

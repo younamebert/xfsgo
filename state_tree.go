@@ -17,6 +17,7 @@
 package xfsgo
 
 import (
+	"bytes"
 	"encoding/hex"
 	"math/big"
 	"xfsgo/avlmerkle"
@@ -209,6 +210,8 @@ func (so *StateObj) GetStateValue(key [32]byte) []byte {
 		return val
 	}
 	return nil
+}
+
 func (so *StateObj) GetData() []byte {
 	return so.code
 }
@@ -221,6 +224,8 @@ func (s *StateObj) SetCode(codeHash common.Hash, code []byte) {
 	// 	prevcode: prevcode,
 	// })
 	s.setCode(codeHash, code)
+}
+
 func (so *StateObj) Update() {
 	for k, v := range so.cacheStorage {
 		so.getStateTree().Put(so.makeStateKey(k), v)

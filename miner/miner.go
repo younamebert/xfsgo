@@ -466,7 +466,9 @@ out:
 				continue
 			}
 		}
-
+		if block == nil {
+			continue out
+		}
 		timeused := time.Now().Sub(startTime)
 
 		hash := block.HeaderHash()

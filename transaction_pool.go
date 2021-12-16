@@ -19,6 +19,7 @@ package xfsgo
 import (
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"math/big"
 	"sort"
 	"sync"
@@ -112,6 +113,7 @@ func (pool *TxPool) validateTx(tx *Transaction) error {
 	if from, err = tx.FromAddr(); err != nil {
 		return invalidSenderErr
 	}
+	logrus.Debugf("Validation transaction: hash=%x, from=%s", tx.Hash(), from.B58String())
 	if !pool.currentState().HashAccount(from) {
 		return balanceErr
 	}
@@ -295,8 +297,8 @@ func (pool *TxPool) eventLoop() {
 }
 
 func (pool *TxPool) GetTransactions() []*Transaction {
-	pool.mu.RLock()
-	defer pool.mu.RUnlock()
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
 	pool.checkQueue()
 	pool.validatePool()
 	txs := make([]*Transaction, 0)
@@ -319,8 +321,8 @@ func (pool *TxPool) GetQueues() []*Transaction {
 }
 
 func (pool *TxPool) GetTransaction(tranHash string) *Transaction {
-	pool.mu.RLock()
-	defer pool.mu.RUnlock()
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
 	pool.checkQueue()
 	pool.validatePool()
 	for _, v := range pool.pending {

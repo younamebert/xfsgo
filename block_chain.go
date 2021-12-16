@@ -40,7 +40,7 @@ const (
 	maxOrphanBlocks    = 100
 	targetTimePerBlock = int64(time.Minute * 3 / time.Second)
 	targetTimespan     = int64(time.Hour * 42 / time.Second)
-	endTimeV1          = int64(time.Hour * 336 / time.Second)
+	endTimeV2          = int64(time.Hour * 1008 / time.Second)
 	//targetTimePerBlock = int64(time.Minute * 1 / time.Second)
 	//targetTimespan  = int64(time.Minute * 10 / time.Second)
 	//endTimeV1 = int64(time.Minute * 10 / time.Second)
@@ -1006,7 +1006,7 @@ func (bc *BlockChain) findAncestor(bHeader *BlockHeader, height uint64) *BlockHe
 }
 func (bc *BlockChain) calcNextRequiredBitsByHeight(height uint64) (uint32, error) {
 	if height > 1 && GenesisBits == TestNetGenesisBits {
-		totalblocks := endTimeV1 / targetTimePerBlock
+		totalblocks := endTimeV2 / targetTimePerBlock
 		//logrus.Infof("total: %d, end: %d, pre: %d, height: %d", totalblocks, endTimeV1, targetTimePerBlock, int64(height))
 		if int64(height) >= totalblocks {
 			return 0, ErrDifficultyOverflow
@@ -1021,13 +1021,15 @@ func (bc *BlockChain) calcNextRequiredBitsByHeight(height uint64) (uint32, error
 	blocksPerRetarget := uint64(targetTimespan / targetTimePerBlock)
 	// if the height of the next block is not an integral multiple of the target，no changes.
 	if lastHeight+1%blocksPerRetarget != 0 {
+		logrus.Infof("need ccc, last: %d, blocksPerRetarget: %d", lastHeight+1, blocksPerRetarget)
 		return lastHeader.Bits, nil
 	}
 	first := bc.findAncestor(lastHeader, blocksPerRetarget-1)
 	if first == nil {
+		logrus.Infof("need bbb")
 		return lastHeader.Bits, nil
 	}
-
+	logrus.Infof("need aaa")
 	firstTime := first.Timestamp
 	lastTime := lastHeader.Timestamp
 	minRetargetTimespan := targetTimespan / adjustmentFactor

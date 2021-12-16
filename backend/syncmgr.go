@@ -137,7 +137,7 @@ func (mgr *syncMgr) handleTransactions(p discover.NodeId, txs RemoteTxs) error {
 		var targetTx *xfsgo.Transaction
 		_ = common.Objcopy(tx, &targetTx)
 		if err := mgr.txPool.Add(targetTx); err != nil {
-			logrus.Warnf("handle transactions msg err: %s", err)
+			//logrus.Warnf("handle transactions msg err: %s", err)
 		}
 	}
 	return nil

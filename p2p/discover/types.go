@@ -9,7 +9,7 @@ import (
 var maxNeighbors int = 1024
 
 type ping struct {
-	Version    uint8
+	Version    int
 	From, To   rpcEndpoint
 	Expiration uint64
 }
@@ -52,37 +52,37 @@ func expired(ts uint64) bool {
 	return time.Unix(int64(ts), 0).Before(time.Now())
 }
 
-func (req *ping) handle(t *udp, from *net.UDPAddr, fromID NodeId, targetID NodeId) error {
+func (req *ping) handle(t *udp, from *net.UDPAddr, fromID NodeId) error {
 	if expired(req.Expiration) {
 		return errExpired
 	}
 	if req.Version != Version {
 		return errBadVersion
 	}
-	_ = t.sendN(fromID, from, PONG, pong{
+	_ = t.sendN(from, pongPacket, pong{
 		To:         makeEndpoint(from, req.From.TCP),
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
-	}, targetID)
-	if !t.handleReply(targetID, PING, req) {
+	}, fromID)
+	if !t.handleReply(fromID, pingPacket, req) {
 		// Note: we're ignoring the provided IP address right now
 		go func() {
-			_, _ = t.bond(true, targetID, from, req.From.TCP)
+			_, _ = t.bond(true, fromID, from, req.From.TCP)
 		}()
 	}
 	return nil
 }
 
-func (req *pong) handle(t *udp, from *net.UDPAddr, fromID NodeId, targetID NodeId) error {
+func (req *pong) handle(t *udp, from *net.UDPAddr, fromID NodeId) error {
 	if expired(req.Expiration) {
 		return errExpired
 	}
-	if !t.handleReply(targetID, PONG, req) {
+	if !t.handleReply(fromID, pongPacket, req) {
 		return errUnsolicitedReply
 	}
 	return nil
 }
 
-func (req *findnode) handle(t *udp, from *net.UDPAddr, fromID NodeId, targetID NodeId) error {
+func (req *findnode) handle(t *udp, from *net.UDPAddr, fromID NodeId) error {
 	if expired(req.Expiration) {
 		return errExpired
 	}
@@ -96,7 +96,7 @@ func (req *findnode) handle(t *udp, from *net.UDPAddr, fromID NodeId, targetID N
 		// (which is a much bigger packet than findnode) to the victim.
 		return errUnknownNode
 	}
-	target := crypto.ByteHash256(targetID[:])
+	target := crypto.ByteHash256(fromID[:])
 	t.mu.Lock()
 	closest := t.closest(target, bucketSize).entries
 	t.mu.Unlock()
@@ -107,18 +107,18 @@ func (req *findnode) handle(t *udp, from *net.UDPAddr, fromID NodeId, targetID N
 	for i, n := range closest {
 		p.Nodes = append(p.Nodes, nodeToRPC(n))
 		if len(p.Nodes) == maxNeighbors || i == len(closest)-1 {
-			_ = t.sendN(fromID, from, NODES, p, targetID)
+			_ = t.sendN(from, neighborsPacket, p, fromID)
 			p.Nodes = p.Nodes[:0]
 		}
 	}
 	return nil
 }
 
-func (req *neighbors) handle(t *udp, from *net.UDPAddr, fromID NodeId, targetID NodeId) error {
+func (req *neighbors) handle(t *udp, from *net.UDPAddr, fromID NodeId) error {
 	if expired(req.Expiration) {
 		return errExpired
 	}
-	if !t.handleReply(targetID, NODES, req) {
+	if !t.handleReply(fromID, neighborsPacket, req) {
 		return errUnsolicitedReply
 	}
 	return nil

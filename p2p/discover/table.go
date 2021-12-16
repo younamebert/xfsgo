@@ -48,9 +48,9 @@ type bondproc struct {
 // it is an interface so we can test without opening lots of UDP
 // sockets and without generating a private key.
 type transport interface {
-	ping(NodeId, NodeId, *net.UDPAddr) error
+	ping(NodeId, *net.UDPAddr) error
 	waitping(NodeId) error
-	findnode(fromId NodeId, toid NodeId, addr *net.UDPAddr, target NodeId) ([]*Node, error)
+	findnode(toid NodeId, addr *net.UDPAddr, target NodeId) ([]*Node, error)
 	close()
 }
 
@@ -209,7 +209,7 @@ func (tab *Table) Lookup(targetID NodeId) []*Node {
 				pendingQueries++
 				go func() {
 					// Find potential neighbors to bond with
-					r, err := tab.net.findnode(tab.self.ID, n.ID, n.addr(), targetID)
+					r, err := tab.net.findnode(n.ID, n.addr(), targetID)
 					if err != nil {
 						// Bump the failure counter to detect and evacuate non-bonded entries
 						fails := tab.db.findFails(n.ID) + 1
@@ -472,7 +472,7 @@ func (tab *Table) ping(id NodeId, addr *net.UDPAddr) error {
 	if err := tab.db.updateLastPing(id, time.Now()); err != nil {
 		return err
 	}
-	if err := tab.net.ping(tab.self.ID, id, addr); err != nil {
+	if err := tab.net.ping(id, addr); err != nil {
 		return err
 	}
 	// Pong received, update the database and return

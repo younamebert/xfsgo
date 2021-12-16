@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"container/list"
 	"crypto/ecdsa"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -15,8 +14,6 @@ import (
 	"xfsgo/crypto"
 	"xfsgo/log"
 	"xfsgo/p2p/nat"
-
-	"github.com/sirupsen/logrus"
 )
 
 const Version = 1
@@ -40,13 +37,12 @@ const (
 	refreshInterval = 1 * time.Hour
 )
 
-// RPC Packet Type
+// RPC packet types
 const (
-	PING  = 0x00 // Request
-	PONG  = 0x01 // Response
-	FIND  = 0x02 // Request (Only UDP)
-	NODES = 0x03 // Response (Only UDP)
-	MSG   = 0x04 // Message
+	pingPacket = iota + 1 // zero is 'reserved'
+	pongPacket
+	findnodePacket
+	neighborsPacket
 )
 
 func makeEndpoint(addr *net.UDPAddr, tcpPort uint16) rpcEndpoint {
@@ -71,7 +67,7 @@ func nodeToRPC(n *Node) rpcNode {
 }
 
 type packet interface {
-	handle(t *udp, from *net.UDPAddr, fromID NodeId, targetID NodeId) error
+	handle(t *udp, from *net.UDPAddr, fromID NodeId) error
 }
 
 type conn interface {
@@ -180,10 +176,10 @@ func (t *udp) close() {
 }
 
 // ping sends a ping message to the given node and waits for a reply.
-func (t *udp) ping(fromId, toid NodeId, toaddr *net.UDPAddr) error {
+func (t *udp) ping(toid NodeId, toaddr *net.UDPAddr) error {
 	// TODO: maybe check for ReplyTo field in callback to measure RTT
-	errc := t.pending(toid, PONG, func(interface{}) bool { return true })
-	_ = t.sendN(fromId, toaddr, PING, ping{
+	errc := t.pending(toid, pongPacket, func(interface{}) bool { return true })
+	_ = t.sendN(toaddr, pingPacket, ping{
 		Version:    Version,
 		From:       t.ourEndpoint,
 		To:         makeEndpoint(toaddr, 0), // TODO: maybe use known TCP port from DB
@@ -193,15 +189,15 @@ func (t *udp) ping(fromId, toid NodeId, toaddr *net.UDPAddr) error {
 }
 
 func (t *udp) waitping(from NodeId) error {
-	return <-t.pending(from, PING, func(interface{}) bool { return true })
+	return <-t.pending(from, pingPacket, func(interface{}) bool { return true })
 }
 
 // findnode sends a findnode request to the given node and waits until
 // the node has sent up to k neighbors.
-func (t *udp) findnode(fromId NodeId, toid NodeId, toaddr *net.UDPAddr, target NodeId) ([]*Node, error) {
+func (t *udp) findnode(toid NodeId, toaddr *net.UDPAddr, target NodeId) ([]*Node, error) {
 	nodes := make([]*Node, 0, bucketSize)
 	nreceived := 0
-	errc := t.pending(toid, NODES, func(r interface{}) bool {
+	errc := t.pending(toid, neighborsPacket, func(r interface{}) bool {
 		reply := r.(*neighbors)
 		for _, rn := range reply.Nodes {
 			nreceived++
@@ -211,7 +207,7 @@ func (t *udp) findnode(fromId NodeId, toid NodeId, toaddr *net.UDPAddr, target N
 		}
 		return nreceived >= bucketSize
 	})
-	_ = t.sendN(fromId, toaddr, FIND, findnode{
+	_ = t.sendN(toaddr, findnodePacket, findnode{
 		Target:     target,
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	}, toid)
@@ -233,10 +229,10 @@ func (t *udp) pending(id NodeId, ptype byte, callback func(interface{}) bool) <-
 	return ch
 }
 
-func (t *udp) handleReply(targetID NodeId, ptype byte, req packet) bool {
+func (t *udp) handleReply(from NodeId, ptype byte, req packet) bool {
 	matched := make(chan bool)
 	select {
-	case t.gotreply <- reply{targetID, ptype, req, matched}:
+	case t.gotreply <- reply{from, ptype, req, matched}:
 		// loop will handle it
 		return <-matched
 	case <-t.closing:
@@ -333,48 +329,77 @@ func (t *udp) loop() {
 		}
 	}
 }
-func (t *udp) sendN(fromId NodeId, toaddr *net.UDPAddr, ptype byte, req interface{}, to NodeId) error {
-	packet, err := encodePacketN(fromId, t.priv, ptype, req, to)
+func (t *udp) sendN(toaddr *net.UDPAddr, ptype byte, req interface{}, to NodeId) error {
+	packet, err := encodePacketN(t.priv, ptype, req, to)
 	if err != nil {
 		return err
 	}
+	//t.logger.Infof(">>> %v %T\n", toaddr, req)
 	if _, err = t.conn.WriteToUDP(packet, toaddr); err != nil {
-		logrus.Infof("UDP send failed:%v", err)
+		//t.logger.Errorln("UDP send failed:", err)
+	}
+	return err
+}
+func (t *udp) send(toaddr *net.UDPAddr, ptype byte, req interface{}) error {
+	packet, err := encodePacket(t.priv, ptype, req)
+	if err != nil {
+		return err
+	}
+	//t.logger.Infof(">>> %v %T\n", toaddr, req)
+	if _, err = t.conn.WriteToUDP(packet, toaddr); err != nil {
+		//t.logger.Errorln("UDP send failed:", err)
 	}
 	return err
 }
 
-func encodePacketN(fromId NodeId, privateKey *ecdsa.PrivateKey, ptype byte, req interface{}, remote NodeId) ([]byte, error) {
-	bytePacket := new(bytes.Buffer)
-	bytePacket.WriteByte(Version)
-	bytePacket.WriteByte(ptype)
-	bytePacket.Write(fromId[:])
-	bytePacket.Write(remote[:])
-
+func encodePacket(privateKey *ecdsa.PrivateKey, ptype byte, req interface{}) ([]byte, error) {
+	b := new(bytes.Buffer)
+	b.WriteByte(ptype)
+	//nId := PubKey2NodeId(privateKey.PublicKey)
+	//b.Write(nId[:])
 	bs, err := rawencode.Encode(req)
 	if err != nil {
 		return nil, err
 	}
 	datahash := ahash.SHA256(bs)
 	signed, err := crypto.ECDSASign(datahash, privateKey)
-	if err != nil {
-		return nil, fmt.Errorf("can't sign discv4 packet%v", err)
+	//_=signed
+	b.Write(signed)
+	bsLen := uint32(len(bs))
+	if (bsLen >> 8) > 0 {
+		return nil, fmt.Errorf("out")
 	}
-	bytePacket.Write(signed)
-
-	var dataLen uint32 = uint32(len(bs))
-	var byteLen []byte = make([]byte, 4)
-	binary.BigEndian.PutUint32(byteLen, dataLen)
-	bytePacket.Write(byteLen)
-	bytePacket.Write(bs)
-	return bytePacket.Bytes(), nil
+	b.WriteByte(byte(uint32(len(bs))))
+	b.Write(bs)
+	return b.Bytes(), nil
+}
+func encodePacketN(privateKey *ecdsa.PrivateKey, ptype byte, req interface{}, remote NodeId) ([]byte, error) {
+	b := new(bytes.Buffer)
+	b.WriteByte(ptype)
+	//nId := PubKey2NodeId(privateKey.PublicKey)
+	//b.Write(nId[:])
+	bs, err := rawencode.Encode(req)
+	if err != nil {
+		return nil, err
+	}
+	datahash := ahash.SHA256(bs)
+	signed, err := crypto.ECDSASign(datahash, privateKey)
+	b.Write(signed)
+	b.Write(remote[:])
+	dataLen := len(bs)
+	if (dataLen >> 8) > 0 {
+		return nil, fmt.Errorf("out")
+	}
+	b.WriteByte(byte(dataLen))
+	b.Write(bs)
+	return b.Bytes(), nil
 }
 
 // readLoop runs in its own goroutine. it handles incoming UDP packets.
 func (t *udp) readLoop() {
 	defer func() {
 		if err := t.conn.Close(); err != nil {
-			logrus.Debugf("UDP Close:%v", err)
+			//t.logger.Errorln(err)
 		}
 	}()
 	// Discovery packets are defined to be no larger than 1280 bytes.
@@ -394,31 +419,51 @@ func (t *udp) readLoop() {
 }
 func (t *udp) handlePacketN(from *net.UDPAddr, buf []byte) error {
 	buffer := bytes.NewBuffer(buf)
-	packet, fromID, targetID, err := decodePacketN(buffer, t.self.ID)
+	packet, fromID, err := decodePacketN(buffer, t.self.ID)
 	if err != nil {
-		logrus.Debugf("bad packet:%v", err)
+		//t.log.Debugf("Bad packet from %v: %v", from, err)
 		return err
 	}
-
-	if err = packet.handle(t, from, fromID, targetID); err != nil {
-		logrus.Debugf("packet.handle:%v", err)
+	//status := "ok"
+	if err = packet.handle(t, from, fromID); err != nil {
+		//status = err.Error()
 	}
 
+	//t.logger.Infof("<<< %v %T: %s\n", from, packet, status)
+	return err
+}
+func (t *udp) handlePacket(from *net.UDPAddr, buf []byte) error {
+	buffer := bytes.NewBuffer(buf)
+	packet, fromID, err := decodePacket(buffer)
+	if err != nil {
+		//t.logger.Debugf("Bad packet from %v: %v", from, err)
+		return err
+	}
+	//status := "ok"
+	if err = packet.handle(t, from, fromID); err != nil {
+		//status = err.Error()
+	}
+
+	//t.logger.Infof("<<< %v %T: %s\n", from, packet, status)
 	return err
 }
 
 type packetHeadN struct {
-	version  uint8    // Version
-	packType uint8    // Type
-	from     [64]byte // From
-	to       [64]byte // To
-	sign     [65]byte // Signature
-	len      uint32   // Payload Length
+	mType   uint8
+	sign    [65]byte
+	dataLen uint8
+	remote  NodeId
+}
+type packetHead struct {
+	mType   uint8
+	sign    [65]byte
+	dataLen uint8
 }
 
-const headerLen = 199
+// headerLen = type(1) + sign(65) + len(1)
+const headerLen = 67
 
-func decodePacketHeadN(reader io.Reader) (*packetHeadN, int, error) {
+func decodePacketHead(reader io.Reader) (*packetHead, int, error) {
 	// 0000
 	var hbytes [headerLen]byte
 	last := 0
@@ -431,15 +476,36 @@ func decodePacketHeadN(reader io.Reader) (*packetHeadN, int, error) {
 		copy(hbytes[last:last+n], buf[:n])
 		last += n
 	}
-	ph := new(packetHeadN)
-	version, mType, from, to, sign, dataLen := hbytes[0], hbytes[1], hbytes[2:66], hbytes[66:130], hbytes[130:195], hbytes[195:199]
-	ph.version = version
-	ph.packType = mType
+	ph := new(packetHead)
+	mType, sign, dataLen := hbytes[0], hbytes[1:66], hbytes[66]
+	ph.mType = mType
 	copy(ph.sign[:], sign[:])
-	copy(ph.from[:], from[:])
-	copy(ph.to[:], to[:])
+	ph.dataLen = dataLen
+	return ph, last, nil
+}
 
-	ph.len = binary.BigEndian.Uint32(dataLen)
+// headerLen = type(1) + sign(65) + remote(64) + len(1)
+const headerLen1 = 131
+
+func decodePacketHeadN(reader io.Reader) (*packetHeadN, int, error) {
+	// 0000
+	var hbytes [headerLen1]byte
+	last := 0
+	for last < headerLen1 {
+		var buf [headerLen1]byte
+		n, err := reader.Read(buf[:])
+		if err != nil && err == io.EOF {
+			return nil, last, err
+		}
+		copy(hbytes[last:last+n], buf[:n])
+		last += n
+	}
+	ph := new(packetHeadN)
+	mType, sign, remote, dataLen := hbytes[0], hbytes[1:66], hbytes[66:130], hbytes[130]
+	ph.mType = mType
+	copy(ph.sign[:], sign[:])
+	copy(ph.remote[:], remote)
+	ph.dataLen = dataLen
 	return ph, last, nil
 }
 
@@ -450,47 +516,80 @@ func recoverNodeId(hash, sig []byte) (NodeId, error) {
 	}
 	return PubKey2NodeId(*pubKey), nil
 }
-func decodePacketN(reader io.Reader, self NodeId) (packet, NodeId, NodeId, error) {
+func decodePacketN(reader io.Reader, self NodeId) (packet, NodeId, error) {
 	h, _, err := decodePacketHeadN(reader)
 	if err != nil {
-		return nil, NodeId{}, NodeId{}, err
+		return nil, NodeId{}, err
 	}
-	if !bytes.Equal(self[:], h.to[:]) {
-		return nil, NodeId{}, NodeId{}, fmt.Errorf("id not match")
+	if !bytes.Equal(self[:], h.remote[:]) {
+		return nil, NodeId{}, fmt.Errorf("id not match")
 	}
-
-	var data = make([]byte, h.len)
-	last := uint32(0)
-	for last < h.len {
+	var data = make([]byte, h.dataLen)
+	last := uint8(0)
+	for last < h.dataLen {
+		var buf = make([]byte, h.dataLen)
+		n, err := reader.Read(buf[:])
+		if err != nil && err == io.EOF {
+			return nil, NodeId{}, err
+		}
+		copy(data[last:int(last)+n], buf[:n])
+		last += uint8(n)
+	}
+	datahash := ahash.SHA256(data)
+	nid, err := recoverNodeId(datahash, h.sign[:])
+	if err != nil {
+		return nil, nid, err
+	}
+	var req packet
+	switch ptype := h.mType; ptype {
+	case pingPacket:
+		req = new(ping)
+	case pongPacket:
+		req = new(pong)
+	case findnodePacket:
+		req = new(findnode)
+	case neighborsPacket:
+		req = new(neighbors)
+	default:
+		return nil, nid, fmt.Errorf("unknown type: %d", ptype)
+	}
+	err = rawencode.Decode(data, req)
+	return req, nid, err
+}
+func decodePacket(reader io.Reader) (packet, NodeId, error) {
+	h, _, err := decodePacketHead(reader)
+	if err != nil {
+		return nil, NodeId{}, err
+	}
+	var data = make([]byte, h.dataLen)
+	last := uint8(0)
+	for last < h.dataLen {
 		var buf [^uint8(0)]byte
 		n, err := reader.Read(buf[:])
 		if err != nil && err == io.EOF {
-			return nil, NodeId{}, NodeId{}, err
+			return nil, NodeId{}, err
 		}
 		copy(data[last:int(last)+n], buf[:n])
-		last += uint32(n)
+		last += uint8(n)
 	}
 	datahash := ahash.SHA256(data)
-
-	var from [64]byte // FromID
-	copy(from[:], h.from[:])
 	nid, err := recoverNodeId(datahash, h.sign[:])
 	if err != nil {
-		return nil, NodeId{}, nid, err
+		return nil, nid, err
 	}
 	var req packet
-	switch ptype := h.packType; ptype {
-	case PING:
+	switch ptype := h.mType; ptype {
+	case pingPacket:
 		req = new(ping)
-	case PONG:
+	case pongPacket:
 		req = new(pong)
-	case FIND:
+	case findnodePacket:
 		req = new(findnode)
-	case NODES:
+	case neighborsPacket:
 		req = new(neighbors)
 	default:
-		return nil, from, nid, fmt.Errorf("unknown type: %d", ptype)
+		return nil, nid, fmt.Errorf("unknown type: %d", ptype)
 	}
 	err = rawencode.Decode(data, req)
-	return req, from, nid, err
+	return req, nid, err
 }

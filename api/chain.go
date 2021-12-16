@@ -461,9 +461,9 @@ func (handler *WalletHandler) ContractCall(args SendTransactionArgs, resp *strin
 	stdTx.Data = common.Hex2bytes(args.Code)
 
 	// Judge that the transfer amount cannot be blank
-	if args.Value == "" {
-		return xfsgo.NewRPCError(-1006, "value not be empty")
-	}
+	// if args.Value == "" {
+	// 	return xfsgo.NewRPCError(-1006, "value not be empty")
+	// }
 
 	// Get the wallet address of the initiating transaction
 	var fromAddr common.Address
@@ -501,10 +501,10 @@ func (handler *WalletHandler) ContractCall(args SendTransactionArgs, resp *strin
 	} else {
 		stdTx.GasPrice = handler.TxPendingPool.GetGasPrice()
 	}
-	stdTx.Value, err = common.BaseCoin2Atto(args.Value)
-	if err != nil {
-		return xfsgo.NewRPCErrorCause(-1006, err)
-	}
+	// stdTx.Value, err = common.BaseCoin2Atto(args.Value)
+	// if err != nil {
+	// 	return xfsgo.NewRPCErrorCause(-1006, err)
+	// }
 	if args.Nonce != "" {
 		nonceBig, ok := new(big.Int).SetString(args.Nonce, 10)
 		if !ok {

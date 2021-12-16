@@ -1076,15 +1076,15 @@ func (bc *BlockChain) calcNextRequiredBitsByHeight(height uint64) (uint32, error
 	blocksPerRetarget := uint64(targetTimespan / targetTimePerBlock)
 	// if the height of the next block is not an integral multiple of the target，no changes.
 	if lastHeight+1%blocksPerRetarget != 0 {
-		logrus.Infof("need ccc, last: %d, blocksPerRetarget: %d", lastHeight+1, blocksPerRetarget)
+		//logrus.Infof("need ccc, last: %d, blocksPerRetarget: %d", lastHeight+1, blocksPerRetarget)
 		return lastHeader.Bits, nil
 	}
 	first := bc.findAncestor(lastHeader, blocksPerRetarget-1)
 	if first == nil {
-		logrus.Infof("need bbb")
+		//logrus.Infof("need bbb")
 		return lastHeader.Bits, nil
 	}
-	logrus.Infof("need aaa")
+	//logrus.Infof("need aaa")
 	firstTime := first.Timestamp
 	lastTime := lastHeader.Timestamp
 	minRetargetTimespan := targetTimespan / adjustmentFactor

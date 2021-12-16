@@ -210,7 +210,7 @@ func (handler *WalletHandler) SendTransaction(args SendTransactionArgs, resp *st
 	if args.GasLimit != "" {
 		stdTx.GasLimit = common.ParseString2BigInt(args.GasLimit)
 	} else {
-		stdTx.GasLimit = handler.TxPendingPool.GetGasLimit()
+		stdTx.GasLimit = common.TxGas
 	}
 	if args.GasPrice != "" {
 		gaspriceBig, ok := new(big.Int).SetString(args.GasPrice, 10)
@@ -219,7 +219,7 @@ func (handler *WalletHandler) SendTransaction(args SendTransactionArgs, resp *st
 		}
 		stdTx.GasPrice = common.NanoCoin2Atto(gaspriceBig)
 	} else {
-		stdTx.GasPrice = handler.TxPendingPool.GetGasPrice()
+		stdTx.GasPrice = common.DefaultGasPrice()
 	}
 	stdTx.Value, err = common.BaseCoin2Atto(args.Value)
 	if err != nil {
@@ -297,7 +297,7 @@ func (handler *WalletHandler) Contract(args SendTransactionArgs, resp *string) e
 	if args.GasLimit != "" {
 		stdTx.GasLimit = common.ParseString2BigInt(args.GasLimit)
 	} else {
-		stdTx.GasLimit = handler.TxPendingPool.GetGasLimit()
+		stdTx.GasLimit = common.TxGas
 	}
 	if args.GasPrice != "" {
 		gaspriceBig, ok := new(big.Int).SetString(args.GasPrice, 10)
@@ -306,7 +306,7 @@ func (handler *WalletHandler) Contract(args SendTransactionArgs, resp *string) e
 		}
 		stdTx.GasPrice = common.NanoCoin2Atto(gaspriceBig)
 	} else {
-		stdTx.GasPrice = handler.TxPendingPool.GetGasPrice()
+		stdTx.GasPrice = common.DefaultGasPrice()
 	}
 	stdTx.Value, err = common.BaseCoin2Atto(args.Value)
 	if err != nil {

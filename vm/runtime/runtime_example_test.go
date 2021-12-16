@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"xfsgo/common"
-	"xfsgo/xfsvm/vm/runtime"
+	"xfsgo/vm/runtime"
 )
 
 func ExampleExecute() {

@@ -905,34 +905,34 @@ func buyGas(sender *StateObj, tx *Transaction, gp *GasPool, gas *big.Int) error 
 	return nil
 }
 
-func txPreCheck(stateTree *StateTree, tx *Transaction, gp *GasPool, gas *big.Int) (*StateObj, error) {
-	fromaddr, err := tx.FromAddr()
-	if err != nil {
-		return nil, err
-	}
-	sender := stateTree.GetOrNewStateObj(fromaddr)
-	if sender.GetNonce() != tx.Nonce {
-		return sender, fmt.Errorf("nonce err: want=%d, got=%d", sender.GetNonce(), tx.Nonce)
-	}
-	if err = buyGas(sender, tx, gp, gas); err != nil {
-		return sender, err
-	}
-	return sender, nil
-}
+// func txPreCheck(stateTree *StateTree, tx *Transaction, gp *GasPool, gas *big.Int) (*StateObj, error) {
+// 	fromaddr, err := tx.FromAddr()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	sender := stateTree.GetOrNewStateObj(fromaddr)
+// 	if sender.GetNonce() != tx.Nonce {
+// 		return sender, fmt.Errorf("nonce err: want=%d, got=%d", sender.GetNonce(), tx.Nonce)
+// 	}
+// 	if err = buyGas(sender, tx, gp, gas); err != nil {
+// 		return sender, err
+// 	}
+// 	return sender, nil
+// }
 
 func TxToAddrNotSet(tx *Transaction) bool {
 	return bytes.Equal(tx.To[:], common.ZeroAddr[:])
 }
 
-func (bc *BlockChain) transfer(st *StateTree, seder *StateObj, to common.Address, amount *big.Int) error {
-	toObj := st.GetOrNewStateObj(to)
-	if seder.balance.Cmp(amount) < 0 {
-		return errors.New("from balance is not enough")
-	}
-	seder.SubBalance(amount)
-	toObj.AddBalance(amount)
-	return nil
-}
+// func (bc *BlockChain) transfer(st *StateTree, seder *StateObj, to common.Address, amount *big.Int) error {
+// 	toObj := st.GetOrNewStateObj(to)
+// 	if seder.balance.Cmp(amount) < 0 {
+// 		return errors.New("from balance is not enough")
+// 	}
+// 	seder.SubBalance(amount)
+// 	toObj.AddBalance(amount)
+// 	return nil
+// }
 
 func (bc *BlockChain) GetBlockHashes(from uint64, count uint64) []common.Hash {
 	bc.mu.Lock()

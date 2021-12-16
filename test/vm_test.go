@@ -81,7 +81,7 @@ func TestNewEVMBlockContext(t *testing.T) {
 	cc := ChainContext{}
 	ctx := xfsgo.NewEVMBlockContext(cc.GetHeader(testHash, 0), cc, &fromAddress)
 
-	msg := xfsgo.NewMessage(fromAddress, common.Address{}, nonce, amount, 1000, big.NewInt(1), common.Hex2bytes(data))
+	msg := xfsgo.NewMessage(fromAddress, common.Address{}, nonce, amount, 1000, big.NewInt(1), common.Hex2bytes(data), true)
 	txContext := xfsgo.NewEVMTxContext(msg)
 
 	stateDB := NewMemStorage()

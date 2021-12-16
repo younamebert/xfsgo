@@ -545,7 +545,7 @@ func (handler *WalletHandler) ContractCall(args SendTransactionArgs, resp *strin
 	}
 	statetree := handler.BlockChain.StateAt(block.Header.StateRoot)
 
-	msg := xfsgo.NewMessage(fromAddr, receipt.ContractAddress, 0, value, tx.GasLimit.Uint64(), tx.GasPrice, common.Hex2bytes(data))
+	msg := xfsgo.NewMessage(fromAddr, receipt.ContractAddress, 0, value, tx.GasLimit.Uint64(), tx.GasPrice, common.Hex2bytes(data), true)
 
 	evm, err := handler.BlockChain.GetEVM(msg, statetree, block.Header)
 	if err != nil {

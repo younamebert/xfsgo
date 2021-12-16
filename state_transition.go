@@ -25,6 +25,8 @@ import (
 	"xfsgo/crypto"
 	"xfsgo/params"
 	"xfsgo/vm"
+
+	"github.com/sirupsen/logrus"
 )
 
 var emptyCodeHash = crypto.Keccak256Hash(nil)
@@ -68,6 +70,7 @@ type Message interface {
 	Gas() uint64
 	Value() *big.Int
 	Nonce() uint64
+	IsFake() bool
 	Data() []byte
 }
 
@@ -192,6 +195,7 @@ func (st *StateTransition) buyGas() error {
 	st.gas += st.msg.Gas()
 
 	st.initialGas = st.msg.Gas()
+	logrus.Debugf("st.msg.Gas():%v, mgval:%v,st.gasPrice:%v\n", st.msg.Gas(), mgval, st.gasPrice)
 	st.state.SubBalance(st.msg.From(), mgval)
 	return nil
 }
@@ -219,12 +223,13 @@ func (st *StateTransition) gasUsed() uint64 {
 }
 
 func (st *StateTransition) txPreCheck() error {
-
-	fromaddr := st.msg.From()
-
-	stNonce := st.state.GetNonce(fromaddr)
-	if stNonce != st.msg.Nonce() {
-		return fmt.Errorf("nonce err: want=%d, got=%d", stNonce, st.msg.Nonce())
+	// Only check transactions that are not fake
+	if !st.msg.IsFake() {
+		fromaddr := st.msg.From()
+		stNonce := st.state.GetNonce(fromaddr)
+		if stNonce != st.msg.Nonce() {
+			return fmt.Errorf("nonce err: want=%d, got=%d", stNonce, st.msg.Nonce())
+		}
 	}
 
 	return st.buyGas()
@@ -255,15 +260,16 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// 6. caller has enough balance to cover asset transfer for **topmost** call
 
 	// Check clauses 1-3, buy gas if everything is correct
+	logrus.Debugf("st:%v\n", st)
 	if err := st.txPreCheck(); err != nil {
 		return nil, err
 	}
 	msg := st.msg
 	sender := vm.AccountRef(msg.From())
-
 	contractCreation := msg.To() == common.Address{}
 
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
+	logrus.Debugf("st.data:%v\n", st.data)
 	gas, err := IntrinsicGas(st.data, contractCreation)
 	if err != nil {
 		return nil, err
@@ -272,31 +278,32 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		return nil, fmt.Errorf("%w: have %d, want %d", errors.New("intrinsic gas too low"), st.gas, gas)
 	}
 	st.gas -= gas
+	logrus.Debugf("st.gas:%v, IntrinsicGas gas:%v\n", st.gas, gas)
 
-	// Check clause 6
 	if msg.Value().Sign() > 0 && !st.evm.Context.CanTransfer(st.state, msg.From(), msg.Value()) {
 		return nil, fmt.Errorf("%w: address %v", errors.New("insufficient funds for transfer"), msg.From())
 	}
 
-	// Set up the initial access list.
-	// if rules := st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber); rules.IsBerlin {
-	// 	st.state.PrepareAccessList(msg.From(), msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
-	// }
 	var (
 		ret   []byte
 		vmerr error // vm errors do not effect consensus and are therefore not assigned to err
 	)
 
 	if contractCreation {
-		ret, _, st.gas, vmerr = st.evm.Create(sender, st.data, 1000000, st.value)
+		logrus.Debugf("create contract: st.data:%v, gas:%v, st.value:%v\n", st.data, st.gas, st.value)
+		ret, _, st.gas, vmerr = st.evm.Create(sender, st.data, st.gas, st.value)
+		logrus.Debugf("create contract: ret st.data:%v, gas:%v, st.value:%v\n", st.data, st.gas, st.value)
 
 	} else {
 		// Increment the nonce for the next transaction
+		logrus.Debugf("call contract: ret st.data:%v,gas:%v,st.value:%v\n", st.data, st.gas, st.value)
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
-		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, 1000000, st.value)
+		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
+		logrus.Debugf("call contract: ret st.data:%v,gas:%v,st.value:%v\n", st.data, st.gas, st.value)
 	}
 
-	st.state.AddBalance(st.evm.Context.Coinbase, new(big.Int).SetUint64(st.gasUsed()))
+	logrus.Debugf("addbalance:%v\n", new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice))
+	st.state.AddBalance(st.evm.Context.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice))
 
 	return &ExecutionResult{
 		UsedGas:    st.gasUsed(),

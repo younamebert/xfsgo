@@ -466,7 +466,9 @@ out:
 				continue
 			}
 		}
+
 		timeused := time.Now().Sub(startTime)
+
 		hash := block.HeaderHash()
 		workload := xfsgo.CalcWorkloadByBits(block.Bits())
 		workloadUint64 := workload.Uint64()

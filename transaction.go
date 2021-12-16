@@ -329,9 +329,7 @@ func SortByPriceAndNonce(txs []*Transaction) {
 	}
 }
 
-// Message is a fully derived transaction and implements core.Message
-//
-// NOTE: In a future PR this will be removed.
+// MessageImp is a fully derived transaction and implements Message
 type MessageImp struct {
 	to       common.Address
 	from     common.Address
@@ -339,10 +337,11 @@ type MessageImp struct {
 	amount   *big.Int
 	gasLimit uint64
 	gasPrice *big.Int
+	isFake   bool
 	data     []byte
 }
 
-func NewMessage(from common.Address, to common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) MessageImp {
+func NewMessage(from common.Address, to common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, isFake bool) MessageImp {
 	return MessageImp{
 		from:     from,
 		to:       to,
@@ -350,6 +349,7 @@ func NewMessage(from common.Address, to common.Address, nonce uint64, amount *bi
 		amount:   amount,
 		gasLimit: gasLimit,
 		gasPrice: gasPrice,
+		isFake:   isFake,
 		data:     data,
 	}
 }
@@ -380,3 +380,4 @@ func (m MessageImp) Value() *big.Int      { return m.amount }
 func (m MessageImp) Gas() uint64          { return m.gasLimit }
 func (m MessageImp) Nonce() uint64        { return m.nonce }
 func (m MessageImp) Data() []byte         { return m.data }
+func (m MessageImp) IsFake() bool         { return m.isFake }

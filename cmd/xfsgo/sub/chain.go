@@ -85,9 +85,9 @@ var (
 		RunE:                  getSyncStatus,
 	}
 	chainCallCommand = &cobra.Command{
-		Use:                   "contractcall [options] <transaction> <call code> <value=0>",
+		Use:                   "contractcall [options] <contract tx hash> <call code>",
 		DisableFlagsInUseLine: true,
-		Short:                 "Query block synchronization status",
+		Short:                 "Query contract execute result",
 		RunE:                  contractcall,
 	}
 )
@@ -349,9 +349,8 @@ func contractcall(cmd *cobra.Command, args []string) error {
 	cli := xfsgo.NewClient(config.rpcClientApiHost, config.rpcClientApiTimeOut)
 	var result string
 	req := &sendTransactionArgs{
-		Hash:  args[0],
-		Code:  args[1],
-		Value: args[2],
+		Hash: args[0],
+		Code: args[1],
 	}
 
 	if fromAddr != "" {

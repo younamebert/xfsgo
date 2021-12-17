@@ -184,6 +184,9 @@ func (so *StateObj) GetExtra() []byte {
 func (so *StateObj) SetState(key [32]byte, value []byte) {
 	so.cacheStorage[key] = value
 }
+func (so *StateObj) GetCode() []byte {
+	return so.code
+}
 func (so *StateObj) makeStateKey(key [32]byte) []byte {
 	return ahash.SHA256(append(so.address[:], key[:]...))
 }
@@ -332,7 +335,28 @@ func (st *StateTree) GetOrNewStateObj(addr common.Address) *StateObj {
 	}
 	return stateObj
 }
+func (st *StateTree) SetState(addr common.Address, key [32]byte, value []byte) {
+	obj := st.GetOrNewStateObj(addr)
+	if obj != nil {
+		obj.SetState(key, value)
+	}
+}
 
+func (st *StateTree) GetCode(addr common.Address) []byte {
+	obj := st.GetOrNewStateObj(addr)
+	if obj != nil {
+		return obj.GetCode()
+	}
+	return nil
+}
+
+func (st *StateTree) GetStateValue(addr common.Address, key [32]byte) []byte {
+	obj := st.GetOrNewStateObj(addr)
+	if obj != nil {
+		return obj.GetStateValue(key)
+	}
+	return nil
+}
 func (st *StateTree) Root() []byte {
 	return st.merkleTree.Checksum()
 }

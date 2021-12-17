@@ -3,6 +3,7 @@ package vm
 import (
 	"math/big"
 	"xfsgo/common"
+	"xfsgo/core"
 )
 
 type Token interface {
@@ -18,6 +19,7 @@ type Token interface {
 }
 
 type token struct {
+	stateTree   core.StateTree
 	address     common.Address
 	name        string
 	symbol      string

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"encoding/binary"
 	"errors"
 	"math/big"
 	"xfsgo/common"
@@ -126,4 +127,11 @@ func DecodePrivateKey(bs []byte) (uint8, *ecdsa.PrivateKey, error) {
 func ByteHash256(raw []byte) common.Hash {
 	h := ahash.SHA256(raw)
 	return common.Bytes2Hash(h)
+}
+
+func CreateAddress(addrHash common.Hash, nonce uint64) common.Address {
+	var nonceBytes [8]byte
+	binary.LittleEndian.PutUint64(nonceBytes[:], nonce)
+	h := ahash.SHA256(append(addrHash[:], nonceBytes[:]...))
+	return common.Bytes2Address(h)
 }

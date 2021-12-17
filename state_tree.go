@@ -17,6 +17,7 @@
 package xfsgo
 
 import (
+	"bytes"
 	"encoding/hex"
 	"math/big"
 	"xfsgo/avlmerkle"
@@ -92,7 +93,12 @@ func (so *StateObj) Encode() ([]byte, error) {
 		"nonce":   new(big.Int).SetUint64(so.nonce).Text(10),
 		"extra":   hex.EncodeToString(so.extra),
 	}
-
+	if so.code != nil {
+		objmap["code"] = hex.EncodeToString(so.code)
+	}
+	if !bytes.Equal(so.stateRoot[:], common.HashZ[:]) {
+		objmap["state_root"] = hex.EncodeToString(so.stateRoot[:])
+	}
 	enc := common.SortAndEncodeMap(objmap)
 	return []byte(enc), nil
 }

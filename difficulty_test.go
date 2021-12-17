@@ -32,8 +32,10 @@ func TestAccumulateRewards(t *testing.T) {
 }
 
 func Test_mainnetG(t *testing.T) {
-	//bign0 := BitsUnzip(4278190109)
-	//t.Logf("target: %s", fullhex(bign0))
+	bign0 := BitsUnzip(4278190109)
+	t.Logf("target: %s", fullhex(bign0))
+	blocksPerRetarget := uint64(targetTimespan / targetTimePerBlock)
+	t.Logf("blocksPerRetarget: %d", blocksPerRetarget)
 	//minRetargetTimespan := targetTimespan / adjustmentFactor
 	//maxRetargetTimespan := targetTimespan * adjustmentFactor
 	//minTarget := new(big.Int).Mul(bign0, big.NewInt(minRetargetTimespan))

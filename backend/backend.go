@@ -62,10 +62,11 @@ type Params struct {
 // Config contains the configuration options of the Backend.
 type Config struct {
 	*Params
-	ChainDB *badger.Storage
-	KeysDB  *badger.Storage
-	StateDB *badger.Storage
-	ExtraDB *badger.Storage
+	NodeSyncFlag bool
+	ChainDB      *badger.Storage
+	KeysDB       *badger.Storage
+	StateDB      *badger.Storage
+	ExtraDB      *badger.Storage
 }
 type chainSyncProtocol struct {
 	syncMgr *syncMgr
@@ -156,7 +157,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 	}
 	back.syncMgr = newSyncMgr(
 		back.config.ProtocolVersion, back.config.NetworkID,
-		back.blockchain, back.eventBus, back.txPool)
+		back.blockchain, back.eventBus, back.txPool, back.config.NodeSyncFlag)
 	back.p2pServer.Bind(&chainSyncProtocol{
 		syncMgr: back.syncMgr,
 	})

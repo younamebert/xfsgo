@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 	"xfsgo/common"
+	"xfsgo/params"
 	"xfsgo/storage/badger"
 	"xfsgo/vm"
 
@@ -70,7 +71,7 @@ type IBlockChain interface {
 	GetBlockByHashWithoutRec(hash common.Hash) *Block
 	GetReceiptByHash(hash common.Hash) *Receipt
 	GetReceiptByHashIndex(hash common.Hash) *TxIndex
-	GetBlocksFromNumber(num uint64) []*Block
+	// GetBlocksFromNumber(num uint64) []*Block
 	GetBlocksFromHash(hash common.Hash, n int) []*Block
 	GenesisBHeader() *BlockHeader
 	CurrentBHeader() *BlockHeader
@@ -98,8 +99,8 @@ type IBlockChain interface {
 	Boundaries() (uint64, uint64)
 	SetBoundaries(syncStatsOrigin, syncStatsHeight uint64) error
 	InsertChain(block *Block) error
-	ApplyTransactions(stateTree *StateTree, header *BlockHeader, txs []*Transaction) (*big.Int, []*Receipt, error)
-	ApplyTransaction(stateTree *StateTree, _ *BlockHeader, tx *Transaction, gp *GasPool, totalGas *big.Int) (*Receipt, error)
+	// ApplyTransactions(stateTree *StateTree, header *BlockHeader, txs []*Transaction) (*big.Int, []*Receipt, error)
+	// ApplyTransaction(stateTree *StateTree, _ *BlockHeader, tx *Transaction, gp *GasPool, totalGas *big.Int) (*Receipt, error)
 	IntrinsicGas(data []byte) *big.Int
 	GetBlockHashes(from uint64, count uint64) []common.Hash
 	GetBlockHashesFromHash(hash common.Hash, max uint64) (chain []common.Hash)
@@ -108,6 +109,8 @@ type IBlockChain interface {
 	CalcNextRequiredDifficulty() (uint32, error)
 	CalcNextRequiredBitsByHeight(height uint64) (uint32, error)
 	CurrentStateTree() *StateTree
+	GetHeader(hash common.Hash, number uint64) *BlockHeader
+	GetVMConfig() *vm.Config
 }
 
 // BlockChain represents the canonical chain given a database with a genesis
@@ -115,6 +118,7 @@ type IBlockChain interface {
 // The BlockChain also helps in returning blocks required from any chain included
 // in the database as well as blocks that represents the canonical chain.
 type BlockChain struct {
+	chainConfig    *params.ChainConfig // Chain & network configuration
 	stateDB        badger.IStorage
 	chainDB        *chainDB
 	extraDB        *extraDB
@@ -134,6 +138,8 @@ type BlockChain struct {
 	syncStatsOrigin uint64       // Origin block number where syncing started at
 	syncStatsHeight uint64       // Highest block number known when syncing started
 	syncStatsLock   sync.RWMutex // Lock protecting the sync stats fields
+
+	vmConfig vm.Config
 }
 
 func NewBlockChainN(stateDB, chainDB, extraDB badger.IStorage, eventBus *EventBus, debug bool) (*BlockChain, error) {
@@ -165,6 +171,10 @@ func (bc *BlockChain) GetNonce(addr common.Address) uint64 {
 	bc.mu.RLock()
 	defer bc.mu.RUnlock()
 	return bc.stateTree.GetNonce(addr)
+}
+
+func (bc *BlockChain) StateAt(rootHash common.Hash) *StateTree {
+	return NewStateTree(bc.stateDB, rootHash.Bytes())
 }
 
 // getBlockByNumber get Block's Info about the Optimum chain
@@ -228,22 +238,22 @@ func (bc *BlockChain) GetReceiptByHashIndex(hash common.Hash) *TxIndex {
 	return bc.extraDB.GetReceiptByHashIndex(hash)
 }
 
-func (bc *BlockChain) GetBlocksFromNumber(num uint64) []*Block {
+// func (bc *BlockChain) GetBlocksFromNumber(num uint64) []*Block {
 
-	var blocks []*Block
-	blockHeaders := bc.chainDB.GetBlocksByNumber(num)
-	for _, v := range blockHeaders {
-		if v == nil {
-			continue
-		}
-		transactions := bc.extraDB.GetBlockTransactionsByBHash(v.HeaderHash())
-		receipts := bc.extraDB.GetBlockReceiptsByBHash(v.HeaderHash())
-		block := &Block{Header: v, Transactions: transactions, Receipts: receipts}
-		blocks = append(blocks, block)
-	}
+// 	var blocks []*Block
+// 	blockHeaders := bc.chainDB.GetBlocksByNumber(num)
+// 	for _, v := range blockHeaders {
+// 		if v == nil {
+// 			continue
+// 		}
+// 		transactions := bc.extraDB.GetBlockTransactionsByBHash(v.HeaderHash())
+// 		receipts := bc.extraDB.GetBlockReceiptsByBHash(v.HeaderHash())
+// 		block := &Block{Header: v, Transactions: transactions, Receipts: receipts}
+// 		blocks = append(blocks, block)
+// 	}
 
-	return blocks
-}
+// 	return blocks
+// }
 
 func (bc *BlockChain) GetBlocksFromHash(hash common.Hash, n int) []*Block {
 	var blocks = make([]*Block, n)
@@ -287,6 +297,13 @@ func (bc *BlockChain) setLastState() error {
 		bc.lastBlockHash = bHeader.HeaderHash()
 	}
 	return nil
+}
+
+func (bc *BlockChain) GetEVM(msg Message, statedb *StateTree, header *BlockHeader) (*vm.EVM, error) {
+	// Create a new context to be used in the EVM environment
+	txContext := NewEVMTxContext(msg)
+	blockContext := NewEVMBlockContext(header, bc, nil)
+	return vm.NewEVM(blockContext, txContext, statedb, bc.vmConfig), nil
 }
 
 // GetBlockReceiptsByBHash get Receipts by blockheader hash
@@ -806,12 +823,24 @@ func (bc *BlockChain) processOrphans(hash common.Hash) error {
 	return nil
 }
 
+// GetVMConfig returns the block chain VM config.
+func (bc *BlockChain) GetVMConfig() *vm.Config {
+	return &bc.vmConfig
+}
+
+// GetHeader retrieves a block header from the database by hash and number,
+// caching it if found.
+func (bc *BlockChain) GetHeader(hash common.Hash, number uint64) *BlockHeader {
+	return bc.chainDB.GetBlocksByHashAndHeight(hash, number)
+}
+
 func (bc *BlockChain) ApplyTransactions(stateTree *StateTree, header *BlockHeader, txs []*Transaction) (*big.Int, []*Receipt, error) {
 	receipts := make([]*Receipt, 0)
-	totalUsedGas := big.NewInt(0)
+	var totalUsedGas uint64 = 0
 	mGasPool := (*GasPool)(new(big.Int).Set(header.GasLimit))
 	for _, tx := range txs {
-		rec, err := bc.ApplyTransaction(stateTree, header, tx, mGasPool, totalUsedGas)
+		// rec, err := ApplyTransaction(stateTree, header, tx, mGasPool, totalUsedGas)
+		rec, err := ApplyTransaction(bc, nil, mGasPool, stateTree, header, tx, &totalUsedGas, *bc.GetVMConfig())
 		if err != nil {
 			txhash := tx.Hash()
 			logrus.Errorf("Apply transaction err: hash=%x err=%v", txhash[len(txhash)-4:], err)
@@ -821,7 +850,7 @@ func (bc *BlockChain) ApplyTransactions(stateTree *StateTree, header *BlockHeade
 			receipts = append(receipts, rec)
 		}
 	}
-	return totalUsedGas, receipts, nil
+	return new(big.Int).SetUint64(totalUsedGas), receipts, nil
 }
 
 func (bc *BlockChain) checkBlockHeaderSanity(prev, header *BlockHeader, blockHash common.Hash) error {
@@ -862,30 +891,6 @@ func (bc *BlockChain) IntrinsicGas(data []byte) *big.Int {
 	return common.CalcTxInitialCost(data)
 }
 
-type GasPool big.Int
-
-func (gp *GasPool) AddGas(v *big.Int) {
-	i := (*big.Int)(gp)
-	i.Add(i, v)
-}
-
-func (gp *GasPool) GetGas() *big.Int {
-	return (*big.Int)(gp)
-}
-
-func (gp *GasPool) String() string {
-	i := (*big.Int)(gp)
-	return fmt.Sprintf("%s", i)
-}
-func (gp *GasPool) SubGas(v *big.Int) error {
-	i := (*big.Int)(gp)
-	if i.Cmp(v) < 0 {
-		return GasPoolOutErr
-	}
-	i.Sub(i, v)
-	return nil
-}
-
 func buyGas(sender *StateObj, tx *Transaction, gp *GasPool, gas *big.Int) error {
 	mgval := new(big.Int).Mul(tx.GasPrice, tx.GasLimit)
 	if sender.GetBalance().Cmp(mgval) < 0 {
@@ -900,94 +905,34 @@ func buyGas(sender *StateObj, tx *Transaction, gp *GasPool, gas *big.Int) error 
 	return nil
 }
 
-func txPreCheck(stateTree *StateTree, tx *Transaction, gp *GasPool, gas *big.Int) (*StateObj, error) {
-	fromaddr, err := tx.FromAddr()
-	if err != nil {
-		return nil, err
-	}
-	sender := stateTree.GetOrNewStateObj(fromaddr)
-	if sender.GetNonce() != tx.Nonce {
-		return sender, fmt.Errorf("nonce err: want=%d, got=%d", sender.GetNonce(), tx.Nonce)
-	}
-	if err = buyGas(sender, tx, gp, gas); err != nil {
-		return sender, err
-	}
-	return sender, nil
-}
-
-func useGas(gas, amount *big.Int) error {
-	if gas.Cmp(amount) < 0 {
-		return errors.New("out of gas")
-	}
-	gas.Sub(gas, amount)
-	return nil
-}
+// func txPreCheck(stateTree *StateTree, tx *Transaction, gp *GasPool, gas *big.Int) (*StateObj, error) {
+// 	fromaddr, err := tx.FromAddr()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	sender := stateTree.GetOrNewStateObj(fromaddr)
+// 	if sender.GetNonce() != tx.Nonce {
+// 		return sender, fmt.Errorf("nonce err: want=%d, got=%d", sender.GetNonce(), tx.Nonce)
+// 	}
+// 	if err = buyGas(sender, tx, gp, gas); err != nil {
+// 		return sender, err
+// 	}
+// 	return sender, nil
+// }
 
 func TxToAddrNotSet(tx *Transaction) bool {
 	return bytes.Equal(tx.To[:], common.ZeroAddr[:])
 }
 
-func (bc *BlockChain) ApplyTransaction(
-	stateTree *StateTree, _ *BlockHeader,
-	tx *Transaction, gp *GasPool, totalGas *big.Int) (*Receipt, error) {
-	var (
-		err    error
-		sender *StateObj
-		gas    = new(big.Int).SetInt64(0)
-		status uint32
-	)
-
-	if err = bc.checkTransactionSanity(tx); err != nil {
-		return nil, err
-	}
-	if sender, err = txPreCheck(stateTree, tx, gp, gas); err != nil {
-		return nil, err
-	}
-
-	if err = useGas(gas, common.CalcTxInitialCost(tx.Data)); err != nil {
-		return nil, err
-	}
-	if TxToAddrNotSet(tx) {
-		mVm := vm.NewXVM()
-		if err = mVm.Create(sender.address, tx.Data); err == nil {
-			status = 1
-		}
-	} else {
-		fromaddr, _ := tx.FromAddr()
-		txhash := tx.Hash()
-		logrus.Debugf("Transfer: from=%s, to=%s, value=%s, txhash=%x", fromaddr.B58String(), tx.To.B58String(), tx.Value, txhash[len(txhash)-4:])
-		if err = bc.transfer(stateTree, sender, tx.To, tx.Value); err != nil {
-			return nil, err
-		}
-		status = 1
-	}
-	stateTree.AddNonce(sender.address, 1)
-
-	// refundGas
-	remaining := new(big.Int).Mul(gas, tx.GasPrice)
-	sender.AddBalance(remaining)
-	gp.AddGas(gas)
-	mgasused := new(big.Int).Sub(tx.GasLimit, gas)
-	stateTree.UpdateAll()
-	totalGas.Add(totalGas, mgasused)
-	receipt := &Receipt{
-		TxHash:  tx.Hash(),
-		Version: tx.Version,
-		Status:  status,
-		GasUsed: mgasused,
-	}
-	return receipt, nil
-}
-
-func (bc *BlockChain) transfer(st *StateTree, seder *StateObj, to common.Address, amount *big.Int) error {
-	toObj := st.GetOrNewStateObj(to)
-	if seder.balance.Cmp(amount) < 0 {
-		return errors.New("from balance is not enough")
-	}
-	seder.SubBalance(amount)
-	toObj.AddBalance(amount)
-	return nil
-}
+// func (bc *BlockChain) transfer(st *StateTree, seder *StateObj, to common.Address, amount *big.Int) error {
+// 	toObj := st.GetOrNewStateObj(to)
+// 	if seder.balance.Cmp(amount) < 0 {
+// 		return errors.New("from balance is not enough")
+// 	}
+// 	seder.SubBalance(amount)
+// 	toObj.AddBalance(amount)
+// 	return nil
+// }
 
 func (bc *BlockChain) GetBlockHashes(from uint64, count uint64) []common.Hash {
 	bc.mu.Lock()

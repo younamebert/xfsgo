@@ -300,6 +300,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	logrus.Debugf("addbalance:%v\n", new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice))
 	st.state.AddBalance(st.evm.Context.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice))
 
+	logrus.Debugf("ReturnData:%v\n", ret)
 	return &ExecutionResult{
 		UsedGas:    st.gasUsed(),
 		Err:        vmerr,

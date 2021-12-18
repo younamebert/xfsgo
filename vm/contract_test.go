@@ -1,6 +1,8 @@
 package vm
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestBuildBuiltinContract(t *testing.T) {
 	tc := new(token)
@@ -12,4 +14,7 @@ func TestBuildBuiltinContract(t *testing.T) {
 	}
 	_ = code
 
+}
+func TestBuildBuiltinContract2(t *testing.T) {
+	//t.Logf("%s", n.Name())
 }

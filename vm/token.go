@@ -5,32 +5,20 @@ import (
 	"xfsgo/common"
 )
 
-type Token interface {
-	Name() string
-	Symbol() string
-	Decimals() uint8
-	TotalSupply() *big.Int
-	BalanceOf(common.Address) *big.Int
-	Transfer(common.Address, common.Address) bool
-	TransferFrom(common.Address, common.Address, *big.Int) bool
-	Approve(common.Address, *big.Int) bool
-	Allowance(common.Address, common.Address) bool
-}
-
 type token struct {
 	BuiltinContract
-	name        string
-	symbol      string
-	decimals    uint8
-	totalSupply *big.Int
-	balances    map[common.Address]*big.Int
+	name        CTypeString
+	symbol      CTypeString
+	decimals    CTypeUINT8
+	totalSupply CTypeUINT256
+	balances    map[CTypeAddress]CTypeUINT256
 }
 
 func (t *token) Create(
-	name string,
-	symbol string,
-	decimals uint8,
-	totalSupply *big.Int) error {
+	name CTypeString,
+	symbol CTypeString,
+	decimals CTypeUINT8,
+	totalSupply CTypeUINT256) error {
 	t.name = name
 	t.symbol = symbol
 	t.decimals = decimals
@@ -42,23 +30,23 @@ func (t *token) BuiltinId() uint8 {
 	return 0x01
 }
 
-func (t *token) Name() string {
+func (t *token) Name() CTypeString {
 	return t.name
 }
 
-func (t *token) Symbol() string {
+func (t *token) Symbol() CTypeString {
 	return t.symbol
 }
 
-func (t *token) Decimals() uint8 {
+func (t *token) Decimals() CTypeUINT8 {
 	return t.decimals
 }
 
-func (t *token) TotalSupply() *big.Int {
+func (t *token) TotalSupply() CTypeUINT256 {
 	return t.totalSupply
 }
-func (t *token) BalanceOf(common.Address) *big.Int {
-	return nil
+func (t *token) BalanceOf(common.Address) CTypeUINT256 {
+	return CTypeUINT256{}
 }
 func (t *token) Transfer(common.Address, common.Address) bool {
 	return false

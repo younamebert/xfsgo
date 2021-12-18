@@ -41,8 +41,9 @@ func NewXVM(st core.StateTree) *xvm {
 	return vm
 }
 
-func (vm *xvm) newXVMPayload(contract BuiltinContract, address common.Address) (*xvmPayload, error) {
+func (vm *xvm) newXVMPayload(contract BuiltinContract, address common.Address, ch common.Hash) (*xvmPayload, error) {
 	return &xvmPayload{
+		createFn:  ch,
 		address:   address,
 		stateTree: vm.stateTree,
 		contract:  contract,
@@ -54,8 +55,9 @@ func (vm *xvm) readPayload(address common.Address, code []byte) (payload, error)
 		return nil, errUnknownMagicNumber
 	}
 	id := code[4]
+	createfnhashbs := code[5 : 5+len(common.Hash{})]
 	if pk, exists := vm.builtin[id]; exists {
-		return vm.newXVMPayload(pk, address)
+		return vm.newXVMPayload(pk, address, common.Bytes2Hash(createfnhashbs))
 	}
 	return nil, errUnknownContractType
 }

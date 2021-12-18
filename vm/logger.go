@@ -27,8 +27,8 @@ import (
 	"xfsgo/common"
 	"xfsgo/common/hexutil"
 	"xfsgo/common/math"
-
 	"xfsgo/params"
+
 	"xfsgo/types"
 
 	"github.com/holiman/uint256"

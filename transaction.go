@@ -35,6 +35,17 @@ import (
 
 // var defaultGasPrice = new(big.Int).SetUint64(1)    //150000000000
 
+// transaction type
+type TxType uint8
+
+const (
+	Binary TxType = iota
+	LoginCandidate
+	LogoutCandidate
+	Delegate
+	UnDelegate
+)
+
 // Transaction type.
 type Transaction struct {
 	Version   uint32         `json:"version"`
@@ -45,6 +56,7 @@ type Transaction struct {
 	Nonce     uint64         `json:"nonce"`
 	Value     *big.Int       `json:"value"`
 	Signature []byte         `json:"signature"`
+	Type      TxType         `json:"type"`
 }
 
 type StdTransaction struct {
@@ -56,6 +68,7 @@ type StdTransaction struct {
 	Nonce     uint64         `json:"nonce"`
 	Value     *big.Int       `json:"value"`
 	Signature []byte         `json:"signature"`
+	Type      TxType         `json:"type"`
 }
 
 func NewTransaction(to common.Address, gasLimit, gasPrice *big.Int, value *big.Int) *Transaction {
@@ -79,6 +92,7 @@ func NewTransactionByStd(tx *StdTransaction) *Transaction {
 		Nonce:     tx.Nonce,
 		Value:     new(big.Int),
 		Signature: tx.Signature,
+		Type:      tx.Type,
 	}
 	if tx.Version != result.Version {
 		result.Version = tx.Version
@@ -174,6 +188,15 @@ func (t *Transaction) Hash() common.Hash {
 		return common.Hash{}
 	}
 	return common.Bytes2Hash(ahash.SHA256([]byte(enc)))
+}
+
+func (t *Transaction) From() common.Address {
+	pub, err := t.publicKey()
+	if err != nil {
+		return common.Address{}
+	}
+	addr := crypto.DefaultPubKey2Addr(*pub)
+	return addr
 }
 
 func sortAndEncodeMap(data map[string]string) string {

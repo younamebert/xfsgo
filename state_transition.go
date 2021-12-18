@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"xfsgo/avlmerkle"
 	"xfsgo/common"
 	"xfsgo/crypto"
 	"xfsgo/params"
@@ -312,7 +313,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, statedb *StateTree, header *BlockHeader, tx *Transaction, usedGas *uint64, cfg vm.Config) (*Receipt, error) {
+func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, statedb *StateTree, header *BlockHeader, tx *Transaction, usedGas *uint64, cfg vm.Config, dposContext *avlmerkle.DposContext) (*Receipt, error) {
 	msg, err := tx.AsMessage()
 	if err != nil {
 		return nil, err
@@ -320,10 +321,26 @@ func ApplyTransaction(bc ChainContext, author *common.Address, gp *GasPool, stat
 	// Create a new context to be used in the EVM environment
 	blockContext := NewEVMBlockContext(header, bc, author)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, cfg)
-	return applyTransaction(msg, bc, author, gp, statedb, new(big.Int).SetUint64(header.Height), header.HeaderHash(), tx, usedGas, vmenv)
+	return applyTransaction(msg, bc, author, gp, statedb, new(big.Int).SetUint64(header.Height), header.HeaderHash(), tx, usedGas, vmenv, dposContext)
 }
 
-func applyTransaction(msg MessageImp, bc ChainContext, author *common.Address, gp *GasPool, statedb *StateTree, blockNumber *big.Int, blockHash common.Hash, tx *Transaction, usedGas *uint64, evm *vm.EVM) (*Receipt, error) {
+func applyDposMessage(tx *Transaction, dposContext *avlmerkle.DposContext) error {
+	switch tx.Type {
+	case LoginCandidate:
+		dposContext.BecomeCandidate(tx.From())
+	case LogoutCandidate:
+		dposContext.KickoutCandidate(tx.From())
+	case Delegate:
+		dposContext.Delegate(tx.From(), *(&tx.To))
+	case UnDelegate:
+		dposContext.UnDelegate(tx.From(), *(&tx.To))
+	default:
+		return errors.New("invalid transaction type")
+	}
+	return nil
+}
+
+func applyTransaction(msg MessageImp, bc ChainContext, author *common.Address, gp *GasPool, statedb *StateTree, blockNumber *big.Int, blockHash common.Hash, tx *Transaction, usedGas *uint64, evm *vm.EVM, dposContext *avlmerkle.DposContext) (*Receipt, error) {
 	// Create a new context to be used in the EVM environment.
 	txContext := NewEVMTxContext(msg)
 	evm.Reset(txContext, statedb)
@@ -332,6 +349,13 @@ func applyTransaction(msg MessageImp, bc ChainContext, author *common.Address, g
 	result, err := ApplyMessage(evm, msg, gp)
 	if err != nil {
 		return nil, err
+	}
+
+	// author:bert
+	if tx.Type != Binary {
+		if err := applyDposMessage(tx, dposContext); err != nil {
+			return nil, err
+		}
 	}
 
 	receipt := &Receipt{}

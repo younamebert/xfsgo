@@ -199,7 +199,15 @@ func (so *StateObj) makeStateKey(key [32]byte) []byte {
 	return ahash.SHA256(append(so.address[:], key[:]...))
 }
 func (so *StateObj) getStateTree() *avlmerkle.Tree {
-	return avlmerkle.NewTree(so.db, so.stateRoot[:])
+	return avlmerkle.NewTree(so.db, so.stateRoot[:], nil)
+}
+
+func NewStateObjN(address common.Address, tree *StateTree) *StateObj {
+	obj := &StateObj{
+		address:    address,
+		merkleTree: tree.merkleTree,
+	}
+	return obj
 }
 
 func (so *StateObj) GetStateValue(key [32]byte) []byte {
@@ -269,7 +277,7 @@ func NewStateTree(db badger.IStorage, root []byte) *StateTree {
 		treeDB: db,
 		objs:   make(map[common.Address]*StateObj),
 	}
-	st.merkleTree = avlmerkle.NewTree(st.treeDB, root)
+	st.merkleTree = avlmerkle.NewTree(st.treeDB, root, nil)
 	return st
 }
 func NewStateTreeN(db badger.IStorage, root []byte) (*StateTree, error) {
@@ -279,7 +287,7 @@ func NewStateTreeN(db badger.IStorage, root []byte) (*StateTree, error) {
 		treeDB: db,
 		objs:   make(map[common.Address]*StateObj),
 	}
-	st.merkleTree, err = avlmerkle.NewTreeN(st.treeDB, root)
+	st.merkleTree, err = avlmerkle.NewTreeN(st.treeDB, root, nil)
 	return st, err
 }
 func (st *StateTree) HashAccount(addr common.Address) bool {

@@ -250,6 +250,8 @@ func (handler *WalletHandler) SendTransaction(args SendTransactionArgs, resp *st
 		state := handler.TxPendingPool.State()
 		stdTx.Nonce = state.GetNonce(fromAddr)
 	}
+	stdTx.Type = xfsgo.TxType(args.Type)
+
 	tx := xfsgo.NewTransactionByStd(stdTx)
 	err = tx.SignWithPrivateKey(privateKey)
 	if err != nil {
@@ -337,6 +339,8 @@ func (handler *WalletHandler) Contract(args SendTransactionArgs, resp *string) e
 		state := handler.TxPendingPool.State()
 		stdTx.Nonce = state.GetNonce(fromAddr)
 	}
+	stdTx.Type = xfsgo.TxType(args.Type)
+
 	tx := xfsgo.NewTransactionByStd(stdTx)
 	err = tx.SignWithPrivateKey(privateKey)
 	if err != nil {

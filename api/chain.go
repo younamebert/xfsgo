@@ -112,6 +112,7 @@ type SendTransactionArgs struct {
 	Nonce    string `json:"nonce"`
 	Code     string `json:"code"`
 	Hash     string `json:"hash"`
+	Type     int    `json:"type"`
 }
 
 func (handler *ChainAPIHandler) GetBlockByNumber(args GetBlockByNumArgs, resp **BlockResp) error {
@@ -515,6 +516,7 @@ func (handler *WalletHandler) ContractCall(args SendTransactionArgs, resp *strin
 		state := handler.TxPendingPool.State()
 		stdTx.Nonce = state.GetNonce(fromAddr)
 	}
+	stdTx.Type = xfsgo.TxType(args.Type)
 
 	tx := xfsgo.NewTransactionByStd(stdTx)
 	err = tx.SignWithPrivateKey(privateKey)

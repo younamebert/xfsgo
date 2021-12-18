@@ -63,6 +63,7 @@ type orphanBlock struct {
 	expire time.Time
 }
 type IBlockChain interface {
+	Config() *params.ChainConfig
 	GetNonce(addr common.Address) uint64
 	GetBlockByNumber(num uint64) *Block
 	getBlockByNumber(num uint64) *Block
@@ -75,6 +76,8 @@ type IBlockChain interface {
 	GetBlocksFromHash(hash common.Hash, n int) []*Block
 	GenesisBHeader() *BlockHeader
 	CurrentBHeader() *BlockHeader
+	CurrentBlock() *Block
+	StateAt(rootHash common.Hash) *StateTree
 	LatestGasLimit() *big.Int
 	LastBlockHash() common.Hash
 	setLastState() error
@@ -84,7 +87,6 @@ type IBlockChain interface {
 	GetHead() *Block
 	GetBalance(addr common.Address) *big.Int
 	WriteBlock(block *Block) error
-	writeBlock(block *Block) error
 	WriteReceipts2ExtraDB(bHash common.Hash, receipts []*Receipt) error
 	WriteTransactions2ExtraDB(bHash common.Hash, height uint64, transactions []*Transaction) error
 	WriteBHeader2ChainDBWithHash(blockHeader *BlockHeader) error
@@ -184,6 +186,10 @@ func (bc *BlockChain) GetBlockByNumber(num uint64) *Block {
 	return bc.getBlockByNumber(num)
 }
 
+func (bc *BlockChain) Config() *params.ChainConfig {
+	return bc.chainConfig
+}
+
 // getBlockByNumber get Block's Info about the Optimum chain
 func (bc *BlockChain) getBlockByNumber(num uint64) *Block {
 	blockHeader := bc.chainDB.GetBlockHeaderByHeight(num)
@@ -279,6 +285,13 @@ func (bc *BlockChain) CurrentBHeader() *BlockHeader {
 	defer bc.mu.RUnlock()
 	return bc.currentBHeader
 }
+
+func (bc *BlockChain) CurrentBlock() *Block {
+	bc.mu.RLock()
+	defer bc.mu.RUnlock()
+	return bc.GetBlockByHash(bc.lastBlockHash)
+}
+
 func (bc *BlockChain) LatestGasLimit() *big.Int {
 	bc.mu.RLock()
 	defer bc.mu.RUnlock()
@@ -632,7 +645,7 @@ func (bc *BlockChain) maybeAcceptBlock(block *Block) error {
 		logrus.Errorf("Accept block err: %v", err)
 		return ErrBadBlock
 	}
-	gas, rec, err := bc.ApplyTransactions(stateTree, header, txs)
+	gas, rec, err := bc.ApplyTransactions(stateTree, block, txs)
 	if err != nil {
 		logrus.Errorf("Accept block err: %v", err)
 		return ErrApplyTransactions
@@ -834,13 +847,14 @@ func (bc *BlockChain) GetHeader(hash common.Hash, number uint64) *BlockHeader {
 	return bc.chainDB.GetBlocksByHashAndHeight(hash, number)
 }
 
-func (bc *BlockChain) ApplyTransactions(stateTree *StateTree, header *BlockHeader, txs []*Transaction) (*big.Int, []*Receipt, error) {
+func (bc *BlockChain) ApplyTransactions(stateTree *StateTree, block *Block, txs []*Transaction) (*big.Int, []*Receipt, error) {
 	receipts := make([]*Receipt, 0)
 	var totalUsedGas uint64 = 0
+	header := block.Header
 	mGasPool := (*GasPool)(new(big.Int).Set(header.GasLimit))
 	for _, tx := range txs {
 		// rec, err := ApplyTransaction(stateTree, header, tx, mGasPool, totalUsedGas)
-		rec, err := ApplyTransaction(bc, nil, mGasPool, stateTree, header, tx, &totalUsedGas, *bc.GetVMConfig())
+		rec, err := ApplyTransaction(bc, nil, mGasPool, stateTree, header, tx, &totalUsedGas, *bc.GetVMConfig(), block.DposCtx())
 		if err != nil {
 			txhash := tx.Hash()
 			logrus.Errorf("Apply transaction err: hash=%x err=%v", txhash[len(txhash)-4:], err)

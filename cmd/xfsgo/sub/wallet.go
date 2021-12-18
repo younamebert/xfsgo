@@ -30,6 +30,7 @@ var (
 	gasLimit      string
 	gasPrice      string
 	nonce         string
+	txtype        int
 	walletCommand = &cobra.Command{
 		Use:                   "wallet <command> [options]",
 		DisableFlagsInUseLine: true,
@@ -358,7 +359,7 @@ func init() {
 	mFlags.StringVarP(&gasPrice, "gasprice", "", "", "Set transaction gas price")
 	mFlags.StringVarP(&gasLimit, "gaslimit", "", "", "Set transaction gas limit")
 	mFlags.StringVarP(&nonce, "nonce", "", "", "Set transaction nonce")
-
+	mFlags.IntVarP(&txtype, "txtype", "", 0, "transaction type, distinguishing election voting")
 	walletCommand.AddCommand(walletContractCommand)
 	mContractFlags := walletContractCommand.PersistentFlags()
 	mContractFlags.StringVarP(&fromAddr, "fromaddress", "a", "", "Set from address")

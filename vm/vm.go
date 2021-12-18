@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"encoding/binary"
 	"errors"
 	"xfsgo/common"
 	"xfsgo/core"
@@ -14,7 +15,7 @@ type VM interface {
 }
 
 const (
-	magicXVMCode = uint32(9168)
+	magicNumberXVM = uint32(9168)
 )
 const (
 	typeXIP2 = uint8(0x01)
@@ -22,51 +23,51 @@ const (
 )
 
 var (
+	errUnknownMagicNumber  = errors.New("unknown magic number")
 	errUnknownContractType = errors.New("unknown contract type")
 )
 
 type xvm struct {
 	stateTree core.StateTree
+	builtin   map[uint8]BuiltinContract
 }
 
 func NewXVM(st core.StateTree) *xvm {
-	return &xvm{
+	vm := &xvm{
 		stateTree: st,
+		builtin:   make(map[uint8]BuiltinContract),
+	}
+	vm.registerBuiltinId(new(token))
+	return vm
+}
+
+func (vm *xvm) newXVMPayload(contract BuiltinContract, address common.Address) (*xvmPayload, error) {
+	return &xvmPayload{
+		address:   address,
+		stateTree: vm.stateTree,
+		contract:  contract,
+	}, nil
+}
+func (vm *xvm) readPayload(address common.Address, code []byte) (payload, error) {
+	m := binary.LittleEndian.Uint32(code[:4])
+	if m != magicNumberXVM {
+		return nil, errUnknownMagicNumber
+	}
+	id := code[4]
+	if pk, exists := vm.builtin[id]; exists {
+		return vm.newXVMPayload(pk, address)
+	}
+	return nil, errUnknownContractType
+}
+func (vm *xvm) registerBuiltinId(b BuiltinContract) {
+	if _, exists := vm.builtin[b.BuiltinId()]; !exists {
+		vm.builtin[b.BuiltinId()] = b
 	}
 }
-
-type codeHeader struct {
-	magic uint32
-	mType uint8
-}
-
-func readCodeHeader(code []byte) (*codeHeader, error) {
-
-	return nil, nil
-}
-
-func (vm *xvm) readPayload(h *codeHeader, code []byte) (payload, error) {
-	if h.magic == magicXVMCode {
-		switch h.mType {
-		case typeXIP2:
-		case typeXIP3:
-		default:
-			return nil, errUnknownContractType
-		}
-	}
-}
-
 func (vm *xvm) Run(addr common.Address, code []byte, input []byte) error {
-	header, err := readCodeHeader(code)
-	if err != nil {
-		return err
-	}
-	pl, err := vm.readPayload(header, code)
-	if err != nil {
-		return err
-	}
+	pl, err := vm.readPayload(addr, code)
 	if input == nil {
-		if err = pl.Create(addr); err != nil {
+		if err = pl.Create(input); err != nil {
 			return err
 		}
 	} else if err = pl.Call(input); err != nil {

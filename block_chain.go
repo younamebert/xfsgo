@@ -948,7 +948,7 @@ func (bc *BlockChain) ApplyTransaction(
 		return nil, err
 	}
 	if TxToAddrNotSet(tx) {
-		mVm := vm.NewXVM()
+		mVm := vm.NewXVM(stateTree)
 		if err = mVm.Create(sender.address, tx.Data); err == nil {
 			status = 1
 		}

@@ -3,7 +3,6 @@ package vm
 import (
 	"math/big"
 	"xfsgo/common"
-	"xfsgo/core"
 )
 
 type Token interface {
@@ -19,25 +18,42 @@ type Token interface {
 }
 
 type token struct {
-	stateTree   core.StateTree
-	address     common.Address
+	BuiltinContract
 	name        string
 	symbol      string
 	decimals    uint8
 	totalSupply *big.Int
-	owner       common.Address
-	sender      common.Address
+	balances    map[common.Address]*big.Int
+}
+
+func (t *token) Create(
+	name string,
+	symbol string,
+	decimals uint8,
+	totalSupply *big.Int) error {
+	t.name = name
+	t.symbol = symbol
+	t.decimals = decimals
+	t.totalSupply = totalSupply
+	return nil
+}
+
+func (t *token) BuiltinId() uint8 {
+	return 0x01
 }
 
 func (t *token) Name() string {
 	return t.name
 }
+
 func (t *token) Symbol() string {
 	return t.symbol
 }
+
 func (t *token) Decimals() uint8 {
 	return t.decimals
 }
+
 func (t *token) TotalSupply() *big.Int {
 	return t.totalSupply
 }

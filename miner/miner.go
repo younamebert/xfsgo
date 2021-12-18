@@ -436,10 +436,10 @@ func (m *Miner) createNewWork() (*Work, error) {
 	work.Block = block
 	work.receipts = append(work.receipts, res...)
 	work.Block.DposContext = work.dposContext
-	//更新新区块矿工的计数
+
 	logrus.Info("Commit new mining work", "number", work.Block.Height(), "txs", len(work.txs), "elapsed", common.PrettyDuration(time.Since(tstart)))
 	m.unconfirmed.Shift(work.Block.Height())
-	//如果我们真的在采矿，我们只关心伐木。
+
 	return work, nil
 
 }

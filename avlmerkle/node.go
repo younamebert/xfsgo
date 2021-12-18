@@ -144,7 +144,6 @@ func (n *TreeNode) Key() []byte {
 }
 
 func (n *TreeNode) remove(t *Tree, key []byte) *TreeNode {
-	// 找不到key对应node,返回0,nil
 	if n == nil {
 		return nil
 	}
@@ -159,21 +158,19 @@ func (n *TreeNode) remove(t *Tree, key []byte) *TreeNode {
 		retNode = n
 	default:
 		switch {
-		case n.leftNode == nil: // 待删除节点左子树为空的情况
+		case n.leftNode == nil:
 			retNode = n.rightNode
-		case n.rightNode == nil: // 待删除节点右子树为空的情况
+		case n.rightNode == nil:
 			retNode = n.leftNode
 		default:
-			// 待删除节点左右子树均不为空的情况
-			// 找到比待删除节点大的最小节点,即右子树的最小节点
+
 			retNode := n.rightNode.getMinNode()
-			// TODO: 这步好好理解,维护平衡性
+
 			retNode.rightNode = n.rightNode.remove(t, key)
 			retNode.left = n.left
 		}
 	}
 
-	// 前面删除节点后,返回retNode有可能为空,这样在执行下面的语句会产生异常，加这步判定避免异常
 	if retNode == nil {
 		return retNode
 	}
@@ -182,7 +179,6 @@ func (n *TreeNode) remove(t *Tree, key []byte) *TreeNode {
 	return retNode
 }
 
-// 找出以nd为根节点中最小值的节点
 func (n *TreeNode) getMinNode() *TreeNode {
 	if n.left == nil {
 		return n

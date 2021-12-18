@@ -91,14 +91,6 @@ type Dpos struct {
 
 type SignerFn func(*xfsgo.StateObj, []byte) ([]byte, error)
 
-//注：sigHash为集团复制品
-//sigHash返回哈希，该哈希用作权限证明的输入
-//签字。它是除65字节签名之外的整个头的散列
-//包含在额外数据的末尾。
-//
-//注意，该方法要求额外数据至少为65字节，否则
-//恐慌。这样做是为了避免意外地使用这两种表格（签名）
-//（或否），可能会被滥用为同一标头生成不同的哈希。
 func sigHash(header *xfsgo.BlockHeader) common.Hash {
 	// hasher := sha3.NewKeccak256()
 	bs, _ := rawencode.Encode(header)
@@ -500,7 +492,6 @@ func NextSlot(now int64) int64 {
 	return int64((now+blockInterval-1)/blockInterval) * blockInterval
 }
 
-// //更新新锁矿工的MintCntTrie中的计数
 func updateMintCnt(parentBlockTime, currentBlockTime int64, validator common.Address, dposContext *avlmerkle.DposContext) {
 	currentMintCntTrie := dposContext.MintCntTrie()
 	currentEpoch := parentBlockTime / epochInterval
@@ -524,7 +515,6 @@ func updateMintCnt(parentBlockTime, currentBlockTime int64, validator common.Add
 		})
 		// iter := trie.NewIterator(currentMintCntTrie.NodeIterator(currentEpochBytes))
 
-		// // 当当前不是genesis时，从MintCntTrie读取上次计数
 		// if iter.Next() {
 		// 	cntBytes := currentMintCntTrie.Get(append(currentEpochBytes, validator.Bytes()...))
 

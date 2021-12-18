@@ -15,8 +15,8 @@ import (
 
 // Ethash proof-of-work protocol constants.
 var (
-	frontierBlockReward  *big.Int = big.NewInt(5e+18) //魏成功挖掘区块的区块奖励
-	byzantiumBlockReward *big.Int = big.NewInt(3e+18) //魏成功从拜占庭向上开采区块的区块奖励
+	frontierBlockReward  *big.Int = big.NewInt(5e+18)
+	byzantiumBlockReward *big.Int = big.NewInt(3e+18)
 	// maxUncles                     = 2                 // Maximum number of uncles allowed in a single block
 )
 
@@ -393,9 +393,6 @@ func calcDifficultyHomestead(time uint64, parent *xfsgo.BlockHeader) *big.Int {
 	return x
 }
 
-//calcDifficultyFrontier是难度调整算法。它返回
-//在给定父对象的时间创建新块时应具有的难度
-//区块的时间和困难。计算使用边界规则。
 func calcDifficultyFrontier(time uint64, parent *xfsgo.BlockHeader) *big.Int {
 	diff := new(big.Int)
 	adjust := new(big.Int).Div(parent.Difficulty, params.DifficultyBoundDivisor)
@@ -500,10 +497,6 @@ var (
 	big32 = big.NewInt(32)
 )
 
-//累计向指定区块的coinbase授予采矿权
-//奖励。总奖励包括静态块奖励和
-//包括叔叔。每个叔叔区块的硬币库也会得到奖励。
-//TODO（卡拉拉贝）：将链制造商移动到此包中，并将其私有化！
 func AccumulateRewards(config *params.ChainConfig, state *xfsgo.StateTree, header *xfsgo.BlockHeader) {
 	// Select the correct block reward based on chain progression
 	blockReward := frontierBlockReward

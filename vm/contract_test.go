@@ -15,6 +15,14 @@ func TestBuildBuiltinContract(t *testing.T) {
 	_ = code
 
 }
+func createToken(
+	name CTypeString,
+	symbol CTypeString,
+	decimals CTypeUINT8,
+	totalSupply CTypeUINT256) {
+
+}
 func TestBuildBuiltinContract2(t *testing.T) {
 	//t.Logf("%s", n.Name())
+
 }

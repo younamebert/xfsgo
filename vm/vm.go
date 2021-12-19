@@ -68,11 +68,7 @@ func (vm *xvm) registerBuiltinId(b BuiltinContract) {
 }
 func (vm *xvm) Run(addr common.Address, code []byte, input []byte) error {
 	pl, err := vm.readPayload(addr, code)
-	if input == nil {
-		if err = pl.Create(input); err != nil {
-			return err
-		}
-	} else if err = pl.Call(input); err != nil {
+	if err = pl.Create(input); err != nil {
 		return err
 	}
 	return nil
@@ -80,7 +76,7 @@ func (vm *xvm) Run(addr common.Address, code []byte, input []byte) error {
 func (vm *xvm) Create(addr common.Address, code []byte) error {
 	nonce := vm.stateTree.GetNonce(addr)
 	caddr := crypto.CreateAddress(addr.Hash(), nonce)
-	if err := vm.Run(caddr, code, nil); err != nil {
+	if err := vm.Run(caddr, code[:37], code[37:]); err != nil {
 		return err
 	}
 	return nil

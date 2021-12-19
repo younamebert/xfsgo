@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"bytes"
 	"encoding/hex"
 	"math/big"
 	"testing"
@@ -32,6 +33,17 @@ func newTestStateTree() *testStateTree {
 func readHex2Bytes(s string) ([]byte, error) {
 	return hex.DecodeString(s)
 }
+func mustReadHex2Bytes(s string) []byte {
+	var (
+		bs  []byte
+		err error
+	)
+
+	if bs, err = hex.DecodeString(s); err != nil {
+		panic(err)
+	}
+	return bs
+}
 func TestXvm_Create(t *testing.T) {
 	st := newTestStateTree()
 	vm := NewXVM(st)
@@ -39,7 +51,10 @@ func TestXvm_Create(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = vm.Create(common.Address{}, code); err != nil {
+	buf := bytes.NewBuffer(code)
+	buf.Write(mustReadHex2Bytes("0500000000000000"))
+	buf.Write(mustReadHex2Bytes("0100000000000000"))
+	if err = vm.Create(common.Address{}, buf.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 }

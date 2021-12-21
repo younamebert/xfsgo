@@ -51,7 +51,7 @@ func Hex2bytes(s string) []byte {
 		}
 		bs, err := hex.DecodeString(s)
 		if err != nil {
-			fmt.Printf("Hex2bytes:%v", err)
+			fmt.Printf("Hex2bytes:%v\n", err)
 			return nil
 		}
 		return bs

@@ -65,13 +65,16 @@ func initGenesisDposContext(g *Genesis, db badger.IStorage) *avlmerkle.DposConte
 		return nil
 	}
 	// dc.SetValidators
-	fmt.Print(len(g.Config.Dpos.Validators))
+	// fmt.Print(len(g.Config.Dpos.Validators))
 	// fmt.Printf("%v %v %v\n", g.Config, g.Config.Dpos, g.Config.Dpos.Validators)
-	if len(g.Config.Dpos.Validators) > 0 {
-		dc.SetValidators(g.Config.Dpos.Validators)
-		for _, validator := range g.Config.Dpos.Validators {
-			dc.DelegateTrie().Update(append(validator.Bytes(), validator.Bytes()...), validator.Bytes())
-			dc.CandidateTrie().Update(validator.Bytes(), validator.Bytes())
+	if g.Config.Dpos != nil {
+		fmt.Printf("dpos:%v\n", g.Config.Dpos.Validators)
+		if len(g.Config.Dpos.Validators) > 0 {
+			dc.SetValidators(g.Config.Dpos.Validators)
+			for _, validator := range g.Config.Dpos.Validators {
+				dc.DelegateTrie().Update(append(validator.Bytes(), validator.Bytes()...), validator.Bytes())
+				dc.CandidateTrie().Update(validator.Bytes(), validator.Bytes())
+			}
 		}
 	}
 	return dc

@@ -46,12 +46,17 @@ type MinerSetWorkerArgs struct {
 	Num string `json:"num"`
 }
 
+type SetValidatorArgs struct {
+	Address string `json:"address"`
+}
+
 func (handler *MinerAPIHandler) Start(args MinerStartArgs, resp *string) error {
-	num, err := strconv.ParseUint(args.Num, 10, 32)
+	num, err := strconv.Atoi(args.Num)
 	if err != nil {
 		return errorcase(err)
 	}
-	handler.Miner.Start(uint32(num))
+
+	handler.Miner.StartMining(&num)
 	return nil
 
 }
@@ -62,14 +67,14 @@ func (handler *MinerAPIHandler) Stop(_ EmptyArgs, resp *string) error {
 	return nil
 }
 
-func (handler *MinerAPIHandler) SetWorkers(args MinerSetWorkerArgs, resp *string) error {
-	var err error
-	var num int64
-	if num, err = strconv.ParseInt(args.Num, 10, 64); err != nil {
-		return errorcase(err)
-	}
-	return errorcase(handler.Miner.SetWorkers(uint32(num)))
-}
+// func (handler *MinerAPIHandler) SetWorkers(args MinerSetWorkerArgs, resp *string) error {
+// 	var err error
+// 	var num int64
+// 	if num, err = strconv.ParseInt(args.Num, 10, 64); err != nil {
+// 		return errorcase(err)
+// 	}
+// 	return errorcase(handler.Miner.SetWorkers(uint32(num)))
+// }
 
 func (handler *MinerAPIHandler) SetGasPrice(args MinerSetGasPriceArgs, resp *string) error {
 	gaspriceBig, ok := new(big.Int).SetString(args.Value, 10)
@@ -87,6 +92,11 @@ func (handler *MinerAPIHandler) SetGasPrice(args MinerSetGasPriceArgs, resp *str
 // 	}
 // 	return errorcase(handler.Miner.SetGasLimit(value))
 // }
+
+// SetValidator sets the validator of the miner
+func (handler *MinerAPIHandler) SetValidator(args SetValidatorArgs, resp *bool) {
+
+}
 
 func (handler *MinerAPIHandler) Status(_ EmptyArgs, resp *MinerStatusResp) error {
 	mMiner := handler.Miner

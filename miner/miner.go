@@ -17,6 +17,7 @@
 package miner
 
 import (
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"math/big"
@@ -28,6 +29,7 @@ import (
 	"xfsgo/common"
 	"xfsgo/consensus"
 	"xfsgo/consensus/dpos"
+	"xfsgo/crypto"
 	"xfsgo/storage/badger"
 
 	"github.com/sirupsen/logrus"
@@ -68,6 +70,7 @@ const (
 
 type Config struct {
 	Coinbase   common.Address
+	Validator  common.Address
 	Numworkers uint32
 }
 
@@ -98,24 +101,25 @@ type Miner struct {
 	started bool
 	quit    chan struct{}
 	// runningWorkers   []chan struct{}
-	updateNumWorkers chan uint32
-	numWorkers       uint32
-	eventBus         *xfsgo.EventBus
-	canStart         bool
-	shouldStart      bool
-	pool             *xfsgo.TxPool
-	chain            xfsgo.IBlockChain
-	stateDb          badger.IStorage
-	gasPrice         *big.Int
-	gasLimit         *big.Int
-	LastStartTime    time.Time
-	rmlock           sync.RWMutex
-	remove           map[common.Hash]*xfsgo.Transaction
-	wg               sync.WaitGroup
-	workerWg         sync.WaitGroup
-	runningHashRate  chan common.HashRate
-	lastHashRate     common.HashRate
-	reportHashes     chan uint64
+	// updateNumWorkers chan uint32
+	numWorkers      uint32
+	eventBus        *xfsgo.EventBus
+	canStart        bool
+	shouldStart     bool
+	pool            *xfsgo.TxPool
+	chain           xfsgo.IBlockChain
+	stateDb         badger.IStorage
+	accounts        map[common.Address]*ecdsa.PrivateKey
+	gasPrice        *big.Int
+	gasLimit        *big.Int
+	LastStartTime   time.Time
+	rmlock          sync.RWMutex
+	remove          map[common.Hash]*xfsgo.Transaction
+	wg              sync.WaitGroup
+	workerWg        sync.WaitGroup
+	runningHashRate chan common.HashRate
+	lastHashRate    common.HashRate
+	reportHashes    chan uint64
 
 	engine      consensus.Engine
 	chainDb     badger.IStorage
@@ -125,32 +129,59 @@ type Miner struct {
 }
 
 func NewMiner(config *Config,
-	stateDb badger.IStorage, chain xfsgo.IBlockChain, eventBus *xfsgo.EventBus, pool *xfsgo.TxPool,
-	gasPrice, gasLimit *big.Int, engine consensus.Engine, chainDb badger.IStorage) *Miner {
+	accounts map[common.Address]*ecdsa.PrivateKey,
+	stateDb badger.IStorage,
+	chain xfsgo.IBlockChain,
+	eventBus *xfsgo.EventBus,
+	pool *xfsgo.TxPool,
+	gasPrice, gasLimit *big.Int,
+	engine consensus.Engine,
+	chainDb badger.IStorage) *Miner {
+
 	m := &Miner{
-		Config:           config,
-		chain:            chain,
-		stateDb:          stateDb,
-		numWorkers:       0,
-		updateNumWorkers: make(chan uint32),
-		pool:             pool,
-		canStart:         true,
-		shouldStart:      false,
-		started:          false,
-		eventBus:         eventBus,
-		gasLimit:         gasLimit,
-		gasPrice:         gasPrice,
-		remove:           make(map[common.Hash]*xfsgo.Transaction),
-		reportHashes:     make(chan uint64, 1),
-		runningHashRate:  make(chan common.HashRate),
-		unconfirmed:      newUnconfirmedBlocks(chain, miningLogAtDepth),
-		engine:           engine,
-		chainDb:          chainDb,
-		recv:             make(chan *Result, resultQueueSize),
+		Config:     config,
+		chain:      chain,
+		stateDb:    stateDb,
+		accounts:   make(map[common.Address]*ecdsa.PrivateKey),
+		numWorkers: 0,
+		// updateNumWorkers: make(chan uint32),
+		pool:            pool,
+		canStart:        true,
+		shouldStart:     false,
+		started:         false,
+		eventBus:        eventBus,
+		gasLimit:        gasLimit,
+		gasPrice:        gasPrice,
+		remove:          make(map[common.Hash]*xfsgo.Transaction),
+		reportHashes:    make(chan uint64, 1),
+		runningHashRate: make(chan common.HashRate),
+		unconfirmed:     newUnconfirmedBlocks(chain, miningLogAtDepth),
+		engine:          engine,
+		chainDb:         chainDb,
+		recv:            make(chan *Result, resultQueueSize),
 	}
+	m.accounts = accounts
 	m.LoadLauncher()
 	go m.update()
 	return m
+}
+
+func (m *Miner) isValidator() (common.Address, error) {
+	m.rwmu.RLock()
+	validator := m.Validator
+	m.rwmu.RUnlock()
+	if validator != (common.Address{}) {
+		return validator, nil
+	}
+	for addr := range m.accounts {
+		return addr, nil
+	}
+	return common.Address{}, fmt.Errorf("validator address must be explicitly specified")
+}
+
+func (m *Miner) SetValidator(addr common.Address) bool {
+	m.Validator = addr
+	return true
 }
 
 func (m *Miner) update() {
@@ -174,19 +205,23 @@ out:
 			m.mu.Lock()
 			m.canStart = true
 			m.mu.Unlock()
-			if m.shouldStart {
-				m.Start(m.numWorkers)
-			}
+			// if m.shouldStart {
+			// 	m.Start(m.numWorkers)
+			// }
 		case <-doneSub.Chan():
 			m.mu.Lock()
 			m.canStart = true
 			m.mu.Unlock()
-			if m.shouldStart {
-				m.Start(m.numWorkers)
-			}
+			// if m.shouldStart {
+			// 	m.Start(m.numWorkers)
+			// }
 			break out
 		}
 	}
+}
+
+func (m *Miner) GetWorkerNum() uint32 {
+	return m.numWorkers
 }
 
 func (m *Miner) GetGasPrice() *big.Int {
@@ -199,9 +234,9 @@ func (m *Miner) GetGasLimit() *big.Int {
 	return m.gasLimit
 }
 
-func (m *Miner) GetWorkerNum() uint32 {
-	return m.numWorkers
-}
+// func (m *Miner) GetWorkerNum() uint32 {
+// 	return m.numWorkers
+// }
 
 func (m *Miner) GetMinStatus() bool {
 	return m.started
@@ -218,6 +253,7 @@ func (m *Miner) RunningHashRate() common.HashRate {
 	}
 	return m.lastHashRate
 }
+
 func (m *Miner) SetGasLimit(limit *big.Int) error {
 	m.rwmu.Lock()
 	defer m.rwmu.Unlock()
@@ -291,6 +327,12 @@ func (m *Miner) waitworker() {
 	}
 }
 
+func (m *Miner) getStateTree() *xfsgo.StateTree {
+	lastBlock := m.chain.CurrentBHeader()
+	lastStateRoot := lastBlock.StateRoot
+	return xfsgo.NewStateTree(m.stateDb, lastStateRoot.Bytes())
+}
+
 func (m *Miner) updateWorker() {
 	txPreEventSub := m.eventBus.Subscript(xfsgo.TxPreEvent{})
 	defer txPreEventSub.Unsubscribe()
@@ -308,9 +350,7 @@ out:
 
 			txs := m.pool.GetTransactions()
 
-			lastBlock := m.chain.CurrentBHeader()
-			lastStateRoot := lastBlock.StateRoot
-			stateTree := xfsgo.NewStateTree(m.stateDb, lastStateRoot.Bytes())
+			stateTree := m.getStateTree()
 
 			committx := make([]*xfsgo.Transaction, 0)
 			ignoretxs := make(map[common.Address]struct{})
@@ -469,37 +509,73 @@ func (m *Miner) makeCurrent(parent *xfsgo.Block, header *xfsgo.BlockHeader) erro
 }
 
 // Start starts up xfs mining
-func (m *Miner) Start(w uint32) {
+func (m *Miner) Start() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.started || !m.canStart {
 		return
-	}
-	workers := w
-	if workers == 0 && m.Config.Numworkers != 0 {
-		workers = m.Config.Numworkers
-	} else if workers == 0 {
-		workers = defaultNumWorkers
 	}
 
 	m.quit = make(chan struct{})
 	m.wg.Add(1)
 	go m.mintLoop()
 	m.LastStartTime = time.Now()
-	m.numWorkers = workers
 	m.started = true
 	m.shouldStart = true
 }
-func (m *Miner) SetWorkers(num uint32) error {
-	if num < 1 {
-		return errors.New("number too low")
-	} else if num > maxWorkers {
-		return errors.New("number over max value")
+
+func (m *Miner) StartMining(threads *int) error {
+	// Set the number of threads if the seal engine supports it
+	if threads == nil {
+		threads = new(int)
+	} else if *threads == 0 {
+		*threads = -1 // Disable the miner from within
 	}
-	m.updateNumWorkers <- num
-	m.numWorkers = num
+	m.numWorkers = uint32(*threads)
+	type threaded interface {
+		SetThreads(threads int)
+	}
+	if th, ok := m.engine.(threaded); ok {
+		logrus.Info("Updated mining threads", "threads", *threads)
+		th.SetThreads(*threads)
+	}
+
+	validator, err := m.isValidator()
+	if err != nil {
+		logrus.Error("Cannot start mining without validator", "err", err)
+		return fmt.Errorf("validator missing: %v", err)
+	}
+	if dpos, ok := m.engine.(*dpos.Dpos); ok {
+		_, isaccount := m.accounts[validator]
+		if !isaccount {
+			return fmt.Errorf("coinbase account unavailable locally")
+		}
+		// crypto.ECDSASign(,prikey)
+		dpos.Authorize(validator, m.SignHash)
+	}
+	go m.Start()
 	return nil
 }
+
+func (m *Miner) SignHash(account common.Address, hash []byte) ([]byte, error) {
+	prikey, isaccount := m.accounts[account]
+	if !isaccount {
+		return nil, fmt.Errorf("Coinbase account unavailable locally")
+	}
+	return crypto.ECDSASign(hash, prikey)
+}
+
+// func (m *Miner) SetWorkers(num uint32) error {
+// 	if num < 1 {
+// 		return errors.New("number too low")
+// 	} else if num > maxWorkers {
+// 		return errors.New("number over max value")
+// 	}
+// 	m.updateNumWorkers <- num
+// 	m.numWorkers = num
+// 	return nil
+// }
+
 func (m *Miner) SetCoinbase(address common.Address) {
 	m.Coinbase = address
 }
@@ -526,17 +602,17 @@ out:
 			m.mu.Lock()
 			m.canStart = true
 			m.mu.Unlock()
-			if m.shouldStart {
-				m.Start(m.numWorkers)
-			}
+			// if m.shouldStart {
+			// 	m.Start(m.numWorkers)
+			// }
 		case <-doneSub.Chan():
 			m.mu.Lock()
 			m.canStart = true
 			m.mu.Unlock()
 
-			if m.shouldStart {
-				m.Start(m.numWorkers)
-			}
+			// if m.shouldStart {
+			// 	m.Start(m.numWorkers)
+			// }
 			break out
 		}
 	}

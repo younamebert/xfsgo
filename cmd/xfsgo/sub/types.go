@@ -146,3 +146,7 @@ type TransactionResp struct {
 type TransactionsResp []*TransactionResp
 
 // type DataSet []*map[string]interface{}
+
+type GetBlockNumByValidatorArgs struct {
+	Number string `json:"number"`
+}

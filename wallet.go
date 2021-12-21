@@ -79,6 +79,14 @@ func (w *Wallet) All() map[common.Address]*ecdsa.PrivateKey {
 	return data
 }
 
+func (w *Wallet) Accounts() map[common.Address]struct{} {
+	data := make(map[common.Address]struct{})
+	w.db.Foreach(func(address common.Address, key *ecdsa.PrivateKey) {
+		data[address] = struct{}{}
+	})
+	return data
+}
+
 func (w *Wallet) GetKeyByAddress(address common.Address) (*ecdsa.PrivateKey, error) {
 	w.cacheMu.RLock()
 	if pk, has := w.cache[address]; has {

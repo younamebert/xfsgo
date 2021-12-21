@@ -17,6 +17,7 @@
 package backend
 
 import (
+	"encoding/json"
 	"errors"
 	"log"
 	"math/big"
@@ -85,23 +86,33 @@ func (c *chainSyncProtocol) Run(p p2p.Peer) error {
 //
 func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 	var err error = nil
+
+	chainConfig := &params.ChainConfig{}
+
+	dpos := dpos.New(chainConfig.Dpos, config.ChainDB)
 	back := &Backend{
 		config:    config,
 		p2pServer: stack.P2PServer(),
-		engine:    dpos.New(&params.DposConfig{}, config.ChainDB),
+		engine:    dpos,
 	}
+
+	GenesisConfig := xfsgo.GenesisConfig{
+		StateDB: back.config.StateDB,
+		ChainDB: back.config.ChainDB,
+		Debug:   config.Params.Debug,
+	}
+	geMain := xfsgo.NewGenesis(&GenesisConfig, chainConfig, xfsgo.GenesisBits)
+
 	back.eventBus = xfsgo.NewEventBus()
 	if config.NetworkID == uint32(1) {
 		if xfsgo.VersionMajor() != 1 {
 			return nil, ErrMainNetDisabled
 		}
-		if _, err = xfsgo.WriteMainNetGenesisBlockN(
-			back.config.StateDB, back.config.ChainDB, config.Params.Debug); err != nil {
+		if _, err := geMain.WriteMainNetGenesisBlockN(); err != nil {
 			return nil, ErrWriteGenesisBlock
 		}
 	} else if config.NetworkID == uint32(2) {
-		if _, err = xfsgo.WriteTestNetGenesisBlockN(
-			back.config.StateDB, back.config.ChainDB, config.Params.Debug); err != nil {
+		if _, err := geMain.WriteTestNetGenesisBlockN(); err != nil {
 			return nil, err
 		}
 	} else if len(config.GenesisFile) > 0 {
@@ -109,14 +120,24 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 		if fr, err = os.Open(config.GenesisFile); err != nil {
 			return nil, ErrWriteGenesisBlock
 		}
-		if _, err = xfsgo.WriteGenesisBlockN(
-			back.config.StateDB, back.config.ChainDB, fr, config.Params.Debug); err != nil {
+
+		genesis := new(xfsgo.Genesis)
+		if err := json.NewDecoder(fr).Decode(genesis); err != nil {
+			return nil, err
+		}
+		genesis.StateDB = back.config.StateDB
+		genesis.ChainDB = back.config.ChainDB
+		genesis.Debug = config.Params.Debug
+
+		genesis.Config.Dpos = chainConfig.Dpos
+		if _, err = genesis.WriteGenesisBlockN(); err != nil {
 			return nil, ErrWriteGenesisBlock
 		}
 		_ = fr.Close()
 	} else {
 		return nil, ErrInitialGenesis
 	}
+
 	if back.blockchain, err = xfsgo.NewBlockChainN(
 		back.config.StateDB, back.config.ChainDB,
 		back.config.ExtraDB, back.eventBus,
@@ -144,19 +165,27 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 		Coinbase:   back.wallet.GetDefault(),
 		Numworkers: config.Numworkers,
 	}
-
-	back.miner = miner.NewMiner(minerconfig,
-		back.config.StateDB, back.blockchain,
-		back.eventBus, back.txPool,
-		config.MinGasPrice, common.TxPoolGasLimit, back.engine, config.ChainDB)
+	back.miner = miner.NewMiner(
+		minerconfig,
+		back.wallet.All(),
+		back.config.StateDB,
+		back.blockchain,
+		back.eventBus,
+		back.txPool,
+		config.MinGasPrice,
+		common.TxPoolGasLimit,
+		back.engine,
+		config.ChainDB)
 
 	logrus.Debugf("Initial miner: coinbase=%s, gasPrice=%s, gasLimit=%s",
 		minerconfig.Coinbase.B58String(), config.MinGasPrice, common.TxPoolGasLimit)
 	//Node resgisters apis of baclend on the node  for RPC service.
 	if err = stack.RegisterBackend(
 		back.config.StateDB,
+		back.config.ChainDB,
 		back.blockchain,
 		back.miner,
+		dpos,
 		back.wallet,
 		back.txPool); err != nil {
 		return nil, err

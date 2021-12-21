@@ -360,7 +360,7 @@ func (dc *DposContext) SetMintCnt(mintCnt *Tree)     { dc.mintCntTrie = mintCnt 
 
 func (dc *DposContext) GetValidators() ([]common.Address, error) {
 	var validators []common.Address
-	key := []byte("validator")
+	key := []byte("validator:")
 	validatorsRLP, ok := dc.epochTrie.Get(key)
 	if !ok {
 		return nil, errors.New("get key not data")
@@ -373,7 +373,7 @@ func (dc *DposContext) GetValidators() ([]common.Address, error) {
 }
 
 func (dc *DposContext) SetValidators(validators []common.Address) error {
-	key := []byte("validator")
+	key := []byte("validator:")
 
 	validatorsRLP, err := rawencode.Encode(validators)
 	if err != nil {

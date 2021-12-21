@@ -26,6 +26,7 @@ import (
 	"xfsgo/api"
 	"xfsgo/common"
 	"xfsgo/common/rawencode"
+	"xfsgo/consensus/dpos"
 	"xfsgo/crypto"
 	"xfsgo/miner"
 	"xfsgo/p2p"
@@ -112,9 +113,10 @@ func (n *Node) Start() error {
 
 //RegisterBackend registers built-in APIs.
 func (n *Node) RegisterBackend(
-	stateDb *badger.Storage,
+	stateDb, chainDb *badger.Storage,
 	bc *xfsgo.BlockChain,
 	miner *miner.Miner,
+	dpos *dpos.Dpos,
 	wallet *xfsgo.Wallet,
 	txPool *xfsgo.TxPool) error {
 	chainApiHandler := &api.ChainAPIHandler{
@@ -134,12 +136,20 @@ func (n *Node) RegisterBackend(
 	txPoolHandler := &api.TxPoolHandler{
 		TxPool: txPool,
 	}
+
 	stateHandler := &api.StateAPIHandler{
 		StateDb:    stateDb,
 		BlockChain: bc,
 	}
+
 	netAPIHandler := &api.NetAPIHandler{
 		NetServer: n.P2PServer(),
+	}
+
+	dposApiHandler := &api.DposAPIHandler{
+		Dpos:    dpos,
+		Chain:   bc,
+		ChainDb: chainDb,
 	}
 
 	if err := n.rpcServer.RegisterName("Chain", chainApiHandler); err != nil {
@@ -164,6 +174,10 @@ func (n *Node) RegisterBackend(
 		return err
 	}
 	if err := n.rpcServer.RegisterName("Net", netAPIHandler); err != nil {
+		log.Fatalf("RPC service register error: %s", err)
+		return err
+	}
+	if err := n.rpcServer.RegisterName("Dpos", dposApiHandler); err != nil {
 		log.Fatalf("RPC service register error: %s", err)
 		return err
 	}

@@ -31,15 +31,15 @@ const (
 
 	blockInterval    = int64(10)
 	epochInterval    = int64(86400)
-	maxValidatorSize = 21
+	maxValidatorSize = 1
 	safeSize         = maxValidatorSize*2/3 + 1
 	consensusSize    = maxValidatorSize*2/3 + 1
 )
 
 var (
-	big0  = big.NewInt(0)
-	big8  = big.NewInt(8)
-	big32 = big.NewInt(32)
+	// big0  = big.NewInt(0)
+	// big8  = big.NewInt(8)
+	// big32 = big.NewInt(32)
 
 	frontierBlockReward  *big.Int = big.NewInt(5e+18) // Block reward in wei for successfully mining a block
 	byzantiumBlockReward *big.Int = big.NewInt(3e+18) // Block reward in wei for successfully mining a block upward from Byzantium
@@ -89,7 +89,7 @@ type Dpos struct {
 	stop chan bool
 }
 
-type SignerFn func(*xfsgo.StateObj, []byte) ([]byte, error)
+type SignerFn func(common.Address, []byte) ([]byte, error)
 
 func sigHash(header *xfsgo.BlockHeader) common.Hash {
 	// hasher := sha3.NewKeccak256()
@@ -117,6 +117,13 @@ func (d *Dpos) Coinbase(header *xfsgo.BlockHeader) (common.Address, error) {
 	return header.Coinbase, nil
 }
 
+func (d *Dpos) ConfirmedBlockHeader() *xfsgo.BlockHeader {
+	return d.confirmedBlockHeader
+}
+
+// func (d *Dpos) Db() *badger.Storage {
+// 	return d.db
+// }
 func (d *Dpos) VerifyHeader(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader, seal bool) error {
 	return d.verifyHeader(chain, header, nil)
 }
@@ -241,6 +248,10 @@ func (d *Dpos) verifyBlockSigner(validator common.Address, header *xfsgo.BlockHe
 		return ErrMismatchSignerAndValidator
 	}
 	return nil
+}
+
+func (d *Dpos) LoadConfirmedBlockHeader(chain xfsgo.IBlockChain) (*xfsgo.BlockHeader, error) {
+	return d.loadConfirmedBlockHeader(chain)
 }
 
 func (d *Dpos) updateConfirmedBlockHeader(chain xfsgo.IBlockChain) error {
@@ -426,9 +437,9 @@ func (d *Dpos) Seal(chain xfsgo.IBlockChain, block *xfsgo.Block, stop <-chan str
 
 	// time's up, sign the block
 	headsig := sigHash(header)
-	tree := chain.CurrentStateTree()
-	signAccount := xfsgo.NewStateObjN(d.signer, tree)
-	sighash, err := d.signFn(signAccount, headsig.Bytes())
+	// tree := chain.CurrentStateTree()
+	// signAccount := xfsgo.NewStateObjN(d.signer, tree)
+	sighash, err := d.signFn(d.signer, headsig.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -436,6 +447,9 @@ func (d *Dpos) Seal(chain xfsgo.IBlockChain, block *xfsgo.Block, stop <-chan str
 	return block.WithSeal(header), nil
 }
 
+// func (d *Dpos) signFn() {
+// 	crypto.ECDSASign()
+// }
 func (d *Dpos) CalcDifficulty(chain xfsgo.IBlockChain, time uint64, parent *xfsgo.BlockHeader) *big.Int {
 	return big.NewInt(1)
 }
@@ -450,10 +464,10 @@ func (d *Dpos) APIs(chain xfsgo.IBlockChain) error {
 	return nil
 }
 
-func (d *Dpos) Authorize(signer common.Address, signFn SignerFn) {
+func (d *Dpos) Authorize(signer common.Address, signHash SignerFn) {
 	d.mu.Lock()
 	d.signer = signer
-	d.signFn = signFn
+	d.signFn = signHash
 	d.mu.Unlock()
 }
 

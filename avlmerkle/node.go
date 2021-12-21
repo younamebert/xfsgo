@@ -26,6 +26,8 @@ import (
 	"xfsgo/common/rawencode"
 )
 
+// var EmptyRoot = common.Hex2Hash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+
 type TreeNode struct {
 	leftNode, rightNode *TreeNode
 	left, right         []byte
@@ -132,7 +134,11 @@ func (n *TreeNode) rehash() {
 }
 
 func (n *TreeNode) Hash() common.Hash {
-	return common.Bytes2Hash(n.id)
+	if n != nil {
+		return common.Bytes2Hash(n.id)
+	} else {
+		return common.Hash{}
+	}
 }
 
 func (n *TreeNode) Value() []byte {

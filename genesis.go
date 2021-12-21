@@ -17,13 +17,11 @@
 package xfsgo
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"math/big"
-	"strings"
+	"xfsgo/avlmerkle"
 	"xfsgo/common"
+	"xfsgo/params"
 	"xfsgo/storage/badger"
 
 	"github.com/sirupsen/logrus"
@@ -35,61 +33,102 @@ var (
 	GenesisBits        = MainNetGenesisBits
 )
 
-// WriteGenesisBlock constructs the genesis block for the blockchain and stores it in the hd.
-func WriteGenesisBlock(stateDB, chainDB badger.IStorage, reader io.Reader) (*Block, error) {
-	return WriteGenesisBlockN(stateDB, chainDB, reader, false)
+type GenesisConfig struct {
+	StateDB, ChainDB         badger.IStorage
+	GenesisCoinbase, Balance string
+	Debug                    bool
 }
 
-func WriteGenesisBlockN(stateDB, chainDB badger.IStorage, reader io.Reader, debug bool) (*Block, error) {
-	contents, err := ioutil.ReadAll(reader)
+// Genesis specifies the header fields, state of a genesis block. It also defines accounts
+type Genesis struct {
+	Version       uint32              `json:"version"`
+	HashPrevBlock string              `json:"hash_prev_block"`
+	Timestamp     string              `json:"timestamp"`
+	Coinbase      string              `json:"coinbase"`
+	Bits          uint32              `json:"bits"`
+	Nonce         uint32              `json:"nonce"`
+	ExtraNonce    uint64              `json:"extranonce"`
+	Accounts      map[string]string   `json:"accounts"`
+	GasLimit      *big.Int            `json:"gas_limit"`
+	Config        *params.ChainConfig `json:"config"`
+	GenesisConfig
+}
+
+// WriteGenesisBlock constructs the genesis block for the blockchain and stores it in the hd.
+// func WriteGenesisBlock(stateDB, chainDB badger.IStorage, genesis *Genesis) (*Block, error) {
+// 	return WriteGenesisBlockN(stateDB, chainDB, genesis, false)
+// }
+
+func initGenesisDposContext(g *Genesis, db badger.IStorage) *avlmerkle.DposContext {
+	dc, err := avlmerkle.NewDposContextFromProto(db, &avlmerkle.DposContextProto{})
 	if err != nil {
-		return nil, err
+		return nil
 	}
+	// dc.SetValidators
+	fmt.Print(len(g.Config.Dpos.Validators))
+	// fmt.Printf("%v %v %v\n", g.Config, g.Config.Dpos, g.Config.Dpos.Validators)
+	if len(g.Config.Dpos.Validators) > 0 {
+		dc.SetValidators(g.Config.Dpos.Validators)
+		for _, validator := range g.Config.Dpos.Validators {
+			dc.DelegateTrie().Update(append(validator.Bytes(), validator.Bytes()...), validator.Bytes())
+			dc.CandidateTrie().Update(validator.Bytes(), validator.Bytes())
+		}
+	}
+	return dc
+}
+
+func NewGenesis(config *GenesisConfig, chainConfig *params.ChainConfig, bits uint32) *Genesis {
+	account := make(map[string]string)
+	account[config.GenesisCoinbase] = config.Balance
+	return &Genesis{
+		Config:        chainConfig,
+		GenesisConfig: *config,
+		Nonce:         0,
+		Coinbase:      config.GenesisCoinbase,
+		Accounts:      account,
+		Bits:          bits,
+	}
+}
+
+func (g *Genesis) WriteGenesisBlockN() (*Block, error) {
+
 	// Genesis specifies the header fields, state of a genesis block. It also defines accounts
-	var genesis struct {
-		Version       uint32 `json:"version"`
-		HashPrevBlock string `json:"hash_prev_block"`
-		Timestamp     string `json:"timestamp"`
-		Coinbase      string `json:"coinbase"`
-		Bits          uint32 `json:"bits"`
-		Nonce         uint32 `json:"nonce"`
-		ExtraNonce    uint64 `json:"extranonce"`
-		Accounts      map[string]struct {
-			Balance string `json:"balance"`
-		} `json:"accounts"`
-	}
-	if err = json.Unmarshal(contents, &genesis); err != nil {
-		return nil, err
-	}
-	chaindb := newChainDBN(chainDB, debug)
-	stateTree := NewStateTree(stateDB, nil)
+	chaindb := newChainDBN(g.ChainDB, g.Debug)
+	stateTree := NewStateTree(g.StateDB, nil)
 	//logrus.Debugf("initialize genesis account count: %d", len(genesis.Accounts))
-	for addr, a := range genesis.Accounts {
+	for addr, a := range g.Accounts {
 		address := common.B58ToAddress([]byte(addr))
-		balance := common.ParseString2BigInt(a.Balance)
+		balance := common.ParseString2BigInt(a)
 		stateTree.AddBalance(address, balance)
 		//logrus.Debugf("initialize genesis account: %s, balance: %d", address, balance)
 	}
 	stateTree.UpdateAll()
-	timestamp := common.ParseString2BigInt(genesis.Timestamp)
+	timestamp := common.ParseString2BigInt(g.Timestamp)
 	var coinbase common.Address
-	if genesis.Coinbase != "" {
-		coinbase = common.B58ToAddress([]byte(genesis.Coinbase))
+	if g.Coinbase != "" {
+		coinbase = common.B58ToAddress([]byte(g.Coinbase))
 	}
-	GenesisBits = genesis.Bits
+	GenesisBits = g.Bits
 	rootHash := common.Bytes2Hash(stateTree.Root())
-	HashPrevBlock := common.Hex2Hash(genesis.HashPrevBlock)
+	HashPrevBlock := common.Hex2Hash(g.HashPrevBlock)
+
+	// add dposcontext
+
+	dposContext := initGenesisDposContext(g, g.ChainDB)
+	dposContextProto := dposContext.ToProto()
 	block := NewBlock(&BlockHeader{
-		Nonce:         genesis.Nonce,
-		ExtraNonce:    genesis.ExtraNonce,
+		Nonce:         g.Nonce,
+		ExtraNonce:    g.ExtraNonce,
 		HashPrevBlock: HashPrevBlock,
 		Timestamp:     timestamp.Uint64(),
 		Coinbase:      coinbase,
 		GasUsed:       new(big.Int),
 		GasLimit:      common.GenesisGasLimit,
-		Bits:          genesis.Bits,
+		Bits:          g.Bits,
 		StateRoot:     rootHash,
+		DposContext:   dposContextProto,
 	}, nil, nil)
+
 	if old := chaindb.GetBlockHeaderByHash(block.HeaderHash()); old != nil {
 		logrus.WithField("hash", old.HashHex()).Infof("Genesis Block")
 		oldGeneisBlock := &Block{Header: old, Transactions: nil, Receipts: nil}
@@ -97,59 +136,27 @@ func WriteGenesisBlockN(stateDB, chainDB badger.IStorage, reader io.Reader, debu
 	}
 	logrus.WithField("hash", block.HashHex()).Infof("Write genesis block")
 	//logrus.Infof("write genesis block hash: %s", block.HashHex())
-	if err = stateTree.Commit(); err != nil {
+	if err := stateTree.Commit(); err != nil {
 		return nil, err
 	}
-	if err = chaindb.WriteBHeaderWithHash(block.Header); err != nil {
+	if err := chaindb.WriteBHeaderWithHash(block.Header); err != nil {
 		return nil, err
 	}
-	if err = chaindb.WriteBHeader2Chain(block.Header); err != nil {
+	if err := chaindb.WriteBHeader2Chain(block.Header); err != nil {
 		return nil, err
 	}
+	block.DposContext = dposContext
 	return block, nil
 }
 
-func WriteMainNetGenesisBlock(stateDB, blockDB badger.IStorage) (*Block, error) {
-	return WriteMainNetGenesisBlockN(stateDB, blockDB, false)
+func (g *Genesis) WriteMainNetGenesisBlockN() (*Block, error) {
+	g.Coinbase, g.Balance = "haF8HrbHByusg6VcCqdjZqMrKasKNv7KN", "0"
+	g.Bits = MainNetGenesisBits
+	return g.WriteGenesisBlockN()
 }
 
-func WriteMainNetGenesisBlockN(stateDB, blockDB badger.IStorage, debug bool) (*Block, error) {
-	bits := MainNetGenesisBits
-	jsonStr := fmt.Sprintf(`{
-	"nonce": 0,
-	"bits": %d,
-	"coinbase": "haF8HrbHByusg6VcCqdjZqMrKasKNv7KN"
-}`, bits)
-	return WriteGenesisBlockN(stateDB, blockDB, strings.NewReader(jsonStr), debug)
-}
-
-func WriteTestNetGenesisBlock(stateDB, blockDB badger.IStorage) (*Block, error) {
-	return WriteTestNetGenesisBlockN(stateDB, blockDB, false)
-}
-
-func WriteTestNetGenesisBlockN(stateDB, blockDB badger.IStorage, debug bool) (*Block, error) {
-	jsonStr := fmt.Sprintf(`{
-	"nonce": 0,
-	"bits": %d,
-	"coinbase": "bQfi7kVUf2VAUsBk1R9FEzHXdtNtD98bs",
-	"accounts": {
-		"bQfi7kVUf2VAUsBk1R9FEzHXdtNtD98bs": {"balance": "600000000000000000000000000"}
-	}
-}`, TestNetGenesisBits)
-	return WriteGenesisBlockN(stateDB, blockDB, strings.NewReader(jsonStr), debug)
-}
-
-func WriteTestGenesisBlock(testGenesisBits uint32, stateDB, blockDB badger.IStorage) (*Block, error) {
-	return WriteTestGenesisBlockN(testGenesisBits, stateDB, blockDB, false)
-}
-func WriteTestGenesisBlockN(testGenesisBits uint32, stateDB, blockDB badger.IStorage, debug bool) (*Block, error) {
-	jsonStr := fmt.Sprintf(`{
-	"nonce": 0,
-	"bits": %d,
-	"coinbase": "1A2QiH4FYc9c4nsNjCMxygg9HKTK9EJWX5",
-	"accounts": {
-		"1A2QiH4FYc9c4nsNjCMxygg9HKTK9EJWX5": {"balance": "10000000"}
-	}
-}`, testGenesisBits)
-	return WriteGenesisBlockN(stateDB, blockDB, strings.NewReader(jsonStr), debug)
+func (g *Genesis) WriteTestNetGenesisBlockN() (*Block, error) {
+	g.Coinbase, g.Balance = "bQfi7kVUf2VAUsBk1R9FEzHXdtNtD98bs", "600000000000000000000000000"
+	g.Bits = TestNetGenesisBits
+	return g.WriteGenesisBlockN()
 }

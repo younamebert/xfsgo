@@ -97,6 +97,10 @@ func (ms *ManagedState) GetNonce(addr common.Address) uint64 {
 	}
 }
 
+// func (ms *ManagedState) SignHash(addr common.Address, hash []byte) ([]byte, error) {
+// 	account := ms.getAccount(addr)
+// 	 account.stateObject.address.Hex()
+// }
 func (ms *ManagedState) getAccount(addr common.Address) *account {
 	if account, ok := ms.accounts[addr]; !ok {
 		so := ms.GetOrNewStateObj(addr)

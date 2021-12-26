@@ -1,13 +1,16 @@
 package vm
 
-type CTypeUINT8 uint8
-type CTypeUINT256 [32]uint8
+type CTypeUint8 uint8
+type CTypeUint16 uint16
+type CTypeUint32 uint16
+type CTypeUint256 [32]uint8
 type CTypeString string
 type CTypeAddress [25]byte
 
-var (
-	CTypeUint8N   = "CTypeUINT8"
-	CTypeUINT256N = "CTypeUINT256"
+const (
+	CTypeUint8N   = "CTypeUint8"
+	CTypeUint16N  = "CTypeUint16"
+	CTypeUint256N = "CTypeUint256"
 	CTypeStringN  = "CTypeString"
-	CTypeAddressN = "CTypeString"
+	CTypeAddressN = "CTypeAddress"
 )

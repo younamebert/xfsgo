@@ -60,3 +60,11 @@ func (t *token) Approve(common.Address, *big.Int) bool {
 func (t *token) Allowance(common.Address, common.Address) bool {
 	return false
 }
+
+func BuildTokenCreateCodes(
+	name CTypeString,
+	symbol CTypeString,
+	decimals CTypeUINT8,
+	totalSupply CTypeUINT256) []byte {
+	return nil
+}

@@ -27,9 +27,6 @@ type xvmPayload struct {
 	address   common.Address
 	contract  BuiltinContract
 }
-type inputRow [8]byte
-
-var rowlen = len(inputRow{})
 
 func readInputRow(reader io.Reader) (inputRow, error) {
 	var row inputRow

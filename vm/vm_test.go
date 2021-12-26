@@ -57,6 +57,7 @@ func TestXvm_Create(t *testing.T) {
 	if err = vm.Create(common.Address{}, buf.Bytes()); err != nil {
 		t.Fatal(err)
 	}
+	//buf.Write(new bytes.NewBuffer(""))
 }
 
 func TestXvm_Run(t *testing.T) {

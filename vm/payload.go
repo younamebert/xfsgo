@@ -44,7 +44,7 @@ func (p *xvmPayload) call(fn reflect.Method, input []byte) error {
 			if err != nil {
 				return err
 			}
-			s, err := buf.ReadString(uint32(ssize))
+			s, err := buf.ReadString(int(ssize))
 			if err != nil {
 				return err
 			}

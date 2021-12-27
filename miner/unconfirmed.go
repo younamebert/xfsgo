@@ -63,7 +63,7 @@ func (set *unconfirmedBlocks) Insert(index uint64, hash common.Hash) {
 		set.blocks.Move(-1).Link(item)
 	}
 	// Display a log for the user to notify of a new mined block unconfirmed
-	logrus.Info("🔨 mined potential block", "number", index, "hash", hash)
+	logrus.Infof(" mined potential block number:%v hash:%v\n", index, hash.Hex())
 }
 
 // Shift drops all unconfirmed blocks from the set which exceed the unconfirmed sets depth

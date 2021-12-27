@@ -10,6 +10,7 @@ import (
 	"xfsgo"
 	"xfsgo/avlmerkle"
 	"xfsgo/common"
+	"xfsgo/consensus"
 	"xfsgo/params"
 )
 
@@ -61,7 +62,7 @@ func (ethash *Ethash) VerifyHeader(chain *xfsgo.BlockChain, header *xfsgo.BlockH
 	}
 	parent := chain.GetBlockByNumber(number)
 	if parent == nil {
-		return errors.New("unknown ancestor")
+		return consensus.ErrUnknownAncestor
 	}
 	// Sanity checks passed, do a proper verification
 	return ethash.verifyHeader(chain, header, parent.Header, false, seal)
@@ -140,7 +141,7 @@ func (ethash *Ethash) verifyHeaderWorker(chain *xfsgo.BlockChain, headers []*xfs
 		parent = headers[index-1]
 	}
 	if parent == nil {
-		return errors.New("unknown ancestor")
+		return consensus.ErrUnknownAncestor
 	}
 	if chain.GetBlockByHash(headers[index].HeaderHash()) != nil {
 		return nil // known block
@@ -473,7 +474,7 @@ func (ethash *Ethash) Prepare(chain *xfsgo.BlockChain, header *xfsgo.BlockHeader
 	// parent := chain.GetHeader(header.ParentHash, header.Number().Uint64()-1)
 	parent := chain.GetBlockByNumber(header.Number().Uint64() - 1)
 	if parent == nil {
-		return errors.New("unknown ancestor")
+		return consensus.ErrUnknownAncestor
 	}
 	header.Difficulty = CalcDifficulty(chain.Config(), header.Time().Uint64(), parent.Header)
 

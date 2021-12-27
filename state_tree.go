@@ -243,7 +243,6 @@ func (so *StateObj) Update() {
 	objRaw, _ := rawencode.Encode(so)
 	hash := ahash.SHA256(so.address[:])
 	so.merkleTree.Put(hash, objRaw)
-
 }
 
 func (s *StateObj) setCode(codeHash common.Hash, code []byte) {
@@ -290,6 +289,7 @@ func NewStateTreeN(db badger.IStorage, root []byte) (*StateTree, error) {
 	st.merkleTree, err = avlmerkle.NewTreeN(st.treeDB, root, nil)
 	return st, err
 }
+
 func (st *StateTree) HashAccount(addr common.Address) bool {
 	return st.GetStateObj(addr) != nil
 }

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"xfsgo/common"
 	"xfsgo/common/rawencode"
 	"xfsgo/lru"
@@ -50,8 +51,8 @@ func NewTree(db badger.IStorage, root []byte, prefix []byte) *Tree {
 		t.prefix = prefix
 	}
 	t.cache = lru.NewCache(2048)
-	var zero [32]byte
-	if root != nil && len(root) == 32 && bytes.Compare(root, zero[:]) > common.Zero {
+
+	if !common.BytesEquals(root[:], common.ZeroHash.Bytes()) && root != nil && len(root) == common.HashLen {
 		t.root = t.mustLoadNode(root)
 	}
 
@@ -67,9 +68,11 @@ func NewTreeN(db badger.IStorage, root []byte, prefix []byte) (*Tree, error) {
 	if len(prefix) > 0 {
 		t.prefix = prefix
 	}
+
 	t.cache = lru.NewCache(2048)
-	var zero [32]byte
-	if root != nil && len(root) == 32 && bytes.Compare(root, zero[:]) > common.Zero {
+
+	if !common.BytesEquals(root[:], common.ZeroHash.Bytes()) && root != nil && len(root) == common.HashLen {
+		// fmt.Printf("root1:%s\n", string(root))
 		t.root, err = t.loadNode(root)
 		if err != nil {
 			logrus.Errorf("Faild load tree: root=%x", root[len(root)-4:])
@@ -81,13 +84,14 @@ func NewTreeN(db badger.IStorage, root []byte, prefix []byte) (*Tree, error) {
 }
 
 func (t *Tree) Put(k, v []byte) {
-	if t.root == nil {
-		t.root = newLeafNode(k, v)
-		return
-	}
 
 	if len(t.prefix) > 0 {
 		k = append(k, t.prefix...)
+	}
+
+	if t.root == nil {
+		t.root = newLeafNode(k, v)
+		return
 	}
 
 	t.root = t.root.insert(t, k, v)
@@ -95,7 +99,7 @@ func (t *Tree) Put(k, v []byte) {
 
 func (t *Tree) Remove(k []byte) error {
 	if t.root == nil {
-		return errors.New("failed to remove,avlTree is empty.")
+		return errors.New("failed to remove,avlTree is empty")
 	}
 	if len(t.prefix) > 0 {
 		k = append(k, t.prefix...)
@@ -105,13 +109,7 @@ func (t *Tree) Remove(k []byte) error {
 }
 
 func (t *Tree) Update(k, v []byte) error {
-	if t.root == nil {
-		return errors.New("root not nil")
-	}
-	if len(t.prefix) > 0 {
-		k = append(k, t.prefix...)
-	}
-	t.root = t.root.insert(t, k, v)
+	t.Put(k, v)
 	return nil
 }
 
@@ -203,11 +201,14 @@ func (t *Tree) loadNode(id []byte) (*TreeNode, error) {
 	if data, has := t.cache.Get(mId); has {
 		tn := &TreeNode{}
 		if err := rawencode.Decode(data, tn); err != nil {
+			fmt.Println("tree1", err)
 			return nil, err
 		}
 		return tn, nil
 	}
-	tn, err := t.db.getTreeNodeByKey(append([]byte("tree:"), id...))
+
+	key := append([]byte("tree:"), id...)
+	tn, err := t.db.getTreeNodeByKey(key)
 	if err != nil {
 		return nil, err
 	}
@@ -289,18 +290,21 @@ func (t *Tree) Commit() error {
 	err := t.root.dfsCall(t, func(node *TreeNode) error {
 		root := t.Checksum()
 		_ = root
+
 		key := append([]byte("tree:"), node.id...)
 
 		bs, err := rawencode.Encode(node)
 		if err != nil {
 			return err
 		}
-		// return batch.Put(append([]byte("tree:"), node.id...), bs)
+
 		if len(root) == 0 || len(key) == 0 || len(bs) == 0 {
 			return errors.New("root or key or bs not null")
 		}
-		return batch.Put(key, bs)
+		err = batch.Put(key, bs)
+		return err
 	})
+
 	if err != nil {
 		return err
 	}

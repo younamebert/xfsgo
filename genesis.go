@@ -17,7 +17,6 @@
 package xfsgo
 
 import (
-	"fmt"
 	"math/big"
 	"xfsgo/avlmerkle"
 	"xfsgo/common"
@@ -30,6 +29,7 @@ import (
 var (
 	MainNetGenesisBits = uint32(267386909)
 	TestNetGenesisBits = uint32(4278190110)
+	Timestamp          = "1522052340"
 	GenesisBits        = MainNetGenesisBits
 )
 
@@ -68,13 +68,15 @@ func initGenesisDposContext(g *Genesis, db badger.IStorage) *avlmerkle.DposConte
 	// fmt.Print(len(g.Config.Dpos.Validators))
 	// fmt.Printf("%v %v %v\n", g.Config, g.Config.Dpos, g.Config.Dpos.Validators)
 	if g.Config.Dpos != nil {
-		fmt.Printf("dpos:%v\n", g.Config.Dpos.Validators)
 		if len(g.Config.Dpos.Validators) > 0 {
+			// fmt.Printf("SetValidators:%v\n", g.Config.Dpos.Validators[0].Hex())
 			dc.SetValidators(g.Config.Dpos.Validators)
 			for _, validator := range g.Config.Dpos.Validators {
+				// fmt.Printf("geival:%v\n", validator.B58String())
 				dc.DelegateTrie().Update(append(validator.Bytes(), validator.Bytes()...), validator.Bytes())
 				dc.CandidateTrie().Update(validator.Bytes(), validator.Bytes())
 			}
+			dc.CommitTo()
 		}
 	}
 	return dc
@@ -90,6 +92,7 @@ func NewGenesis(config *GenesisConfig, chainConfig *params.ChainConfig, bits uin
 		Coinbase:      config.GenesisCoinbase,
 		Accounts:      account,
 		Bits:          bits,
+		Timestamp:     Timestamp,
 	}
 }
 
@@ -119,6 +122,7 @@ func (g *Genesis) WriteGenesisBlockN() (*Block, error) {
 
 	dposContext := initGenesisDposContext(g, g.ChainDB)
 	dposContextProto := dposContext.ToProto()
+	// fmt.Printf("timestamp:%v\n", timestamp.Uint64())
 	block := NewBlock(&BlockHeader{
 		Nonce:         g.Nonce,
 		ExtraNonce:    g.ExtraNonce,
@@ -163,3 +167,7 @@ func (g *Genesis) WriteTestNetGenesisBlockN() (*Block, error) {
 	g.Bits = TestNetGenesisBits
 	return g.WriteGenesisBlockN()
 }
+
+// func SetupGenesisBlock(db badger.IStorage, genesis *Genesis) (*params.ChainConfig, common.Hash, error) {
+// 	if genesis != nil && genesis.Config == nil {
+// 		return params.DposChainConfig, common.Hash{}, errors.New("genesis has no chain configuration")

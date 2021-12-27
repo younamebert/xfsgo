@@ -55,3 +55,7 @@ func (db *treeDb) getTreeNodeByKey(key []byte) (*TreeNode, error) {
 	}
 	return node, nil
 }
+
+// func (db *treeDb) treeForeach(fn func(k string, v []byte) error) error {
+// 	return db.storage.Foreach(fn)
+// }

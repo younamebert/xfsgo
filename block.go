@@ -61,7 +61,7 @@ type BlockHeader struct {
 }
 
 func (bHead *BlockHeader) Number() *big.Int {
-	return big.NewInt(int64(bHead.Height))
+	return new(big.Int).SetUint64(bHead.Height)
 }
 
 func (bHead *BlockHeader) HeaderNonce() *big.Int {
@@ -73,7 +73,7 @@ func (bHead *BlockHeader) Root() common.Hash {
 }
 
 func (bHead *BlockHeader) Time() *big.Int {
-	return new(big.Int).SetUint64(bHead.Height)
+	return new(big.Int).SetUint64(bHead.Timestamp)
 }
 
 // BlockHeader hash
@@ -114,6 +114,13 @@ func (bHead *BlockHeader) String() string {
 	return string(jb)
 }
 
+func (bHead *BlockHeader) HashNoNonce() common.Hash {
+	header := bHead.copyTrim()
+	data, _ := rawencode.Encode(header)
+	hash := ahash.SHA256(data)
+	return common.Bytes2Hash(hash)
+}
+
 type Block struct {
 	DposContext  *avlmerkle.DposContext `json:"dposContext"`
 	Header       *BlockHeader           `json:"header"`
@@ -150,6 +157,10 @@ func NewBlock(header *BlockHeader, txs []*Transaction, receipts []*Receipt) *Blo
 
 func (b *Block) GetHeader() *BlockHeader {
 	return b.Header
+}
+
+func (b *Block) GasUsed() *big.Int {
+	return b.Header.GasUsed
 }
 
 // CalcTxsRootHash returns the root hash of transactions merkle tree
@@ -201,6 +212,7 @@ func (b *Block) HeaderHash() common.Hash {
 	hash := ahash.SHA256(data)
 	return common.Bytes2Hash(hash)
 }
+
 func (b *Block) HashHex() string {
 	hash := b.HeaderHash()
 	return hash.Hex()

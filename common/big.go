@@ -16,7 +16,9 @@
 
 package common
 
-import "math/big"
+import (
+	"math/big"
+)
 
 var (
 	Big0          = new(big.Int).SetInt64(0)
@@ -60,4 +62,41 @@ func BigMin(x, y *big.Int) *big.Int {
 	}
 
 	return x
+}
+
+func BigSub(x, y *big.Float) *big.Int {
+	bigfloat0 := new(big.Float).SetUint64(Big0.Uint64())
+
+	result := new(big.Int)
+	info := x.Sub(x, y)
+	if info.Cmp(bigfloat0) < 0 {
+		info.Set(bigfloat0)
+	}
+	ais, _ := info.Uint64()
+	return result.SetUint64(ais)
+}
+
+func BigSubN(x, y uint64) *big.Int {
+	xf := new(big.Float).SetUint64(x)
+	yf := new(big.Float).SetUint64(y)
+	return BigSub(xf, yf)
+}
+
+func IsForked(s, head *big.Int) bool {
+	if s == nil || head == nil {
+		return false
+	}
+	x, ok := new(big.Float).SetString(s.String())
+	if !ok {
+		return false
+	}
+	y, ok := new(big.Float).SetString(head.String())
+	if !ok {
+		return false
+	}
+	if x.Cmp(y) <= 0 {
+		return true
+	} else {
+		return false
+	}
 }

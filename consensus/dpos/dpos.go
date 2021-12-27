@@ -15,6 +15,8 @@ import (
 	"xfsgo/lru"
 	"xfsgo/params"
 
+	"xfsgo/consensus"
+
 	"github.com/sirupsen/logrus"
 
 	"xfsgo/avlmerkle"
@@ -41,8 +43,8 @@ var (
 	// big8  = big.NewInt(8)
 	// big32 = big.NewInt(32)
 
-	frontierBlockReward  *big.Int = big.NewInt(5e+18) // Block reward in wei for successfully mining a block
-	byzantiumBlockReward *big.Int = big.NewInt(3e+18) // Block reward in wei for successfully mining a block upward from Byzantium
+	frontierBlockReward  = common.NanoCoin2Atto(big.NewInt(50)) // Block reward in wei for successfully mining a block
+	byzantiumBlockReward = common.NanoCoin2Atto(big.NewInt(30)) // Block reward in wei for successfully mining a block upward from Byzantium
 
 	timeOfFirstBlock = int64(0)
 
@@ -130,27 +132,27 @@ func (d *Dpos) VerifyHeader(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader, 
 
 func (d *Dpos) verifyHeader(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader, parents []*xfsgo.BlockHeader) error {
 	if header.Number() == nil {
-		return errors.New("unknown block")
+		return errUnknownBlock
 	}
 	number := header.Number().Uint64()
 	// Unnecssary to verify the block from feature
 	if header.Time().Cmp(big.NewInt(time.Now().Unix())) > 0 {
-		return errors.New("block in the future")
+		return consensus.ErrFutureBlock
 	}
 	// Check that the extra-data contains both the vanity and signature
 	if len(header.Extra) < extraVanity {
-		return errors.New("extra-data 32 byte vanity prefix missing")
+		return errMissingVanity
 	}
 	if len(header.Extra) < extraVanity+extraSeal {
-		return errors.New("extra-data 65 byte suffix signature missing")
+		return errMissingVanity
 	}
 	// Ensure that the mix digest is zero as we don't have fork protection currently
 	if header.MixDigest != (common.Hash{}) {
-		return errors.New("non-zero mix digest")
+		return errInvalidMixDigest
 	}
 	// Difficulty always 1
 	if header.Difficulty.Uint64() != 1 {
-		errors.New("invalid difficulty")
+		return errInvalidDifficulty
 	}
 	// Ensure that the block doesn't contain any uncles which are meaningless in DPoS
 	// if header.UncleHash != uncleHash {
@@ -169,7 +171,7 @@ func (d *Dpos) verifyHeader(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader, 
 		// parent = chain.GetHeader(header.ParentHash, number-1)
 	}
 	if parent == nil || parent.Number().Uint64() != number-1 || parent.HashHex() != header.HashHex() {
-		return errors.New("unknown ancestor")
+		return consensus.ErrUnknownAncestor
 	}
 	if parent.Time().Uint64()+uint64(blockInterval) > header.Time().Uint64() {
 		return ErrInvalidTimestamp
@@ -321,17 +323,21 @@ func (s *Dpos) storeConfirmedBlockHeader(db badger.IStorage) error {
 
 func (d *Dpos) Prepare(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader) error {
 	header.Nonce = 0
-	// number := header.Number().Uint64()
+
 	if len(header.Extra) < extraVanity {
 		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, extraVanity-len(header.Extra))...)
 	}
 	header.Extra = header.Extra[:extraVanity]
 	header.Extra = append(header.Extra, make([]byte, extraSeal)...)
-	parent := chain.GetBlockByNumber(header.Height)
+
+	number := common.BigSubN(header.Height, uint64(1))
+
+	parent := chain.GetBlockByNumber(number.Uint64())
 
 	if parent == nil {
-		return errors.New("unknown ancestor")
+		return consensus.ErrUnknownAncestor
 	}
+
 	headerParent := parent.Header
 
 	header.Difficulty = d.CalcDifficulty(chain, header.Time().Uint64(), headerParent)
@@ -341,36 +347,34 @@ func (d *Dpos) Prepare(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader) error
 
 func AccumulateRewards(config *params.ChainConfig, state *xfsgo.StateTree, header *xfsgo.BlockHeader) {
 	// Select the correct block reward based on chain progression
-	blockReward := frontierBlockReward
+	reward := new(big.Int).Set(frontierBlockReward)
 	if config.IsByzantium(header.Number()) {
-		blockReward = byzantiumBlockReward
+		reward.Set(byzantiumBlockReward)
 	}
 	// Accumulate the rewards for the miner and any included uncles
-	reward := new(big.Int).Set(blockReward)
-	state.AddBalance(header.Coinbase, reward)
+	blockreward := new(big.Int).Set(reward)
+	state.AddBalance(header.Coinbase, blockreward)
 }
 
 func (d *Dpos) Finalize(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader, state *xfsgo.StateTree, txs []*xfsgo.Transaction, receipts []*xfsgo.Receipt, dposContext *avlmerkle.DposContext) (*xfsgo.Block, error) {
 	// Accumulate block rewards and commit the final state root
 	AccumulateRewards(chain.Config(), state, header)
-	// header.StateRoot = state.IntermediateRoot(chain.Config().IsEIP158(header.Number()))
-	// header.StateRoot = statfunc Example() {
-	//    header.
-	//Output:
-	// header header.Root()
 
-	// }
-	parent := chain.GetBlockByHash(header.HeaderHash()).Header
+	number := common.BigSubN(header.Height, 1)
+	parent := chain.GetBlockByNumber(number.Uint64()).GetHeader()
+
 	epochContext := &EpochContext{
 		statedb:     state,
 		DposContext: dposContext,
 		TimeStamp:   header.Time().Int64(),
 	}
+
 	if timeOfFirstBlock == 0 {
-		if firstBlockHeader := chain.GetBlockByNumber(1).Header; firstBlockHeader != nil {
-			timeOfFirstBlock = firstBlockHeader.Time().Int64()
+		if firstBlockHeader := chain.GetBlockByNumber(uint64(1)); firstBlockHeader != nil {
+			timeOfFirstBlock = firstBlockHeader.GetHeader().Time().Int64()
 		}
 	}
+
 	genesis := chain.GetBlockByNumber(uint64(0)).Header
 	err := epochContext.tryElect(genesis, parent)
 	if err != nil {
@@ -386,10 +390,10 @@ func (d *Dpos) Finalize(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader, stat
 func (d *Dpos) checkDeadline(lastBlock *xfsgo.Block, now int64) error {
 	prevSlot := PrevSlot(now)
 	nextSlot := NextSlot(now)
+
 	if lastBlock.GetHeader().Time().Int64() >= nextSlot {
 		return ErrMintFutureBlock
 	}
-	// last block was arrived, or time's up
 	if lastBlock.GetHeader().Time().Int64() == prevSlot || nextSlot-now <= 1 {
 		return nil
 	}
@@ -400,16 +404,22 @@ func (d *Dpos) CheckValidator(lastBlock *xfsgo.Block, now int64) error {
 	if err := d.checkDeadline(lastBlock, now); err != nil {
 		return err
 	}
+
 	dposContext, err := avlmerkle.NewDposContextFromProto(d.db, lastBlock.Header.DposContext)
 	if err != nil {
 		return err
 	}
+
 	epochContext := &EpochContext{DposContext: dposContext}
 	validator, err := epochContext.lookupValidator(now)
 	if err != nil {
 		return err
 	}
+
+	logrus.Debugf("hex:%v hex2:%v\n", validator.B58String(), d.signer.B58String())
+
 	if (validator == common.Address{}) || bytes.Compare(validator.Bytes(), d.signer.Bytes()) != 0 {
+		fmt.Println(4)
 		return ErrInvalidBlockValidator
 	}
 	return nil

@@ -20,6 +20,7 @@ type DposContext struct {
 	db            badger.IStorage
 }
 
+// var Eempty
 var (
 	epochPrefix     = []byte("epoch:")
 	delegatePrefix  = []byte("delegate:")
@@ -379,6 +380,6 @@ func (dc *DposContext) SetValidators(validators []common.Address) error {
 	if err != nil {
 		return fmt.Errorf("failed to encode validators to rlp bytes: %s", err)
 	}
-	dc.epochTrie.Update(key, validatorsRLP)
-	return nil
+
+	return dc.epochTrie.Update(key, validatorsRLP)
 }

@@ -35,6 +35,20 @@ var (
 	GoerliGenesisHash  = common.Hex2Hash("0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a")
 )
 
+var DposChainConfig = &ChainConfig{
+	// ChainId:        big.NewInt(5),
+	HomesteadBlock: big.NewInt(0),
+	DAOForkBlock:   nil,
+	DAOForkSupport: false,
+	EIP150Block:    big.NewInt(0),
+	EIP150Hash:     common.Hash{},
+	EIP155Block:    big.NewInt(0),
+	EIP158Block:    big.NewInt(0),
+	ByzantiumBlock: big.NewInt(0),
+
+	Dpos: &DposConfig{},
+}
+
 // TrustedCheckpoints associates each known checkpoint with the genesis hash of
 // the chain it belongs to.
 var TrustedCheckpoints = map[common.Hash]*TrustedCheckpoint{

@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 	"xfsgo/common"
+
 	"xfsgo/params"
 	"xfsgo/storage/badger"
 	"xfsgo/vm"
@@ -62,6 +63,7 @@ type orphanBlock struct {
 	block  *Block
 	expire time.Time
 }
+
 type IBlockChain interface {
 	Config() *params.ChainConfig
 	GetNonce(addr common.Address) uint64
@@ -141,16 +143,21 @@ type BlockChain struct {
 	syncStatsHeight uint64       // Highest block number known when syncing started
 	syncStatsLock   sync.RWMutex // Lock protecting the sync stats fields
 
+	// engine consensus.Engine
+	// validator Validator // block and state validator interface
 	vmConfig vm.Config
 }
 
-func NewBlockChainN(stateDB, chainDB, extraDB badger.IStorage, eventBus *EventBus, debug bool) (*BlockChain, error) {
+func NewBlockChainN(stateDB, chainDB, extraDB badger.IStorage, eventBus *EventBus, chainConf *params.ChainConfig, debug bool) (*BlockChain, error) {
 	bc := &BlockChain{
-		chainDB:  newChainDBN(chainDB, debug),
-		stateDB:  stateDB,
-		extraDB:  newExtraDB(extraDB),
-		eventBus: eventBus,
+		chainDB:     newChainDBN(chainDB, debug),
+		stateDB:     stateDB,
+		extraDB:     newExtraDB(extraDB),
+		eventBus:    eventBus,
+		chainConfig: chainConf,
+		// engine:      engine,
 	}
+
 	bc.orphans = make(map[common.Hash]*orphanBlock)
 	bc.prevOrphans = make(map[common.Hash][]*orphanBlock)
 
@@ -239,6 +246,13 @@ func (bc *BlockChain) GetReceiptByHash(hash common.Hash) *Receipt {
 	return bc.extraDB.GetReceipt(hash)
 
 }
+
+// SetValidator sets the validator which is used to validate incoming blocks.
+// func (bc *BlockChain) SetValidator(validator Validator) {
+// 	bc.mu.RLock()
+// 	defer bc.mu.RUnlock()
+// 	bc.validator = validator
+// }
 
 func (bc *BlockChain) GetReceiptByHashIndex(hash common.Hash) *TxIndex {
 	return bc.extraDB.GetReceiptByHashIndex(hash)
@@ -383,9 +397,11 @@ func (bc *BlockChain) writeBlock(block *Block) error {
 			transactions := bc.GetBlockTransactionsByBHash(bHeader.HeaderHash())
 			receipts := bc.GetBlockReceiptsByBHash(bHeader.HeaderHash())
 			curBlock := &Block{Header: bHeader, Transactions: transactions, Receipts: receipts}
+			// fmt.Printf("reorg curblock:%v block:%v\n", curBlock, block)
 			if err := bc.reorg(curBlock, block); err != nil {
 				return err
 			}
+			fmt.Println("reorg2")
 		}
 		bc.mu.Lock()
 		if err := bc.insertBHeader2Chain(block.Header); err != nil {
@@ -421,22 +437,25 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *Block) error {
 	defer bc.mu.Unlock()
 	var newBlocks []*Block
 	var mNewBlock *Block
+
+	if newBlock == nil {
+		return fmt.Errorf("invalid new chain")
+	}
+
 	//logrus.Debugf("Find newblocks: from=%d, to=%d", newBlock.Height(), oldBlock.Height())
 	for mNewBlock = newBlock; mNewBlock != nil && mNewBlock.Height() != oldBlock.Height(); mNewBlock = bc.GetBlockByHash(mNewBlock.HashPrevBlock()) {
 		//nhash := mNewBlock.Hash()
 		//logrus.Debugf("Append newblock: height=%d, hash=%x", mNewBlock.Height(), nhash[len(nhash)-4:])
 		newBlocks = append(newBlocks, newBlock)
 	}
-	if newBlock == nil {
-		return fmt.Errorf("invalid new chain")
-	}
+
 	mOldBlock := oldBlock
 	var deletedTxs []*Transaction
 	var deletedBlocks []*Block
 	for {
+
 		oldhash := mOldBlock.HeaderHash()
 		newhash := mNewBlock.HeaderHash()
-
 		//logrus.Debugf("Find common hash: old=%x, new=%x", oldhash[len(oldhash)-4:], newhash[len(oldhash)-4:])
 		if bytes.Equal(oldhash[:], newhash[:]) {
 			break
@@ -447,6 +466,7 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *Block) error {
 		deletedTxs = append(deletedTxs, mOldBlock.Transactions...)
 		deletedBlocks = append(deletedBlocks, mOldBlock)
 		mOldBlock = bc.GetBlockByHash(mOldBlock.HashPrevBlock())
+
 		mNewBlock = bc.GetBlockByHash(mNewBlock.HashPrevBlock())
 		if mOldBlock == nil {
 			return fmt.Errorf("invalid old chain")
@@ -718,6 +738,24 @@ func (bc *BlockChain) InsertChain(block *Block) error {
 	if err := bc.checkBlockHeaderSanity(parent.Header, header, blockHash); err != nil {
 		return ErrBadBlock
 	}
+
+	// //update name:bert
+	// if err := bc.validator.ValidateBody(parent); err != nil {
+	// 	return err
+	// }
+
+	// // Validate the dpos state using the default validator
+	// if err := bc.validator.ValidateDposState(parent); err != nil {
+	// 	return err
+	// }
+	// Validate validator
+	// dposEngine, isDpos := bc.engine.(*dpos.Dpos)
+	// if isDpos {
+	// 	err := dposEngine.VerifySeal(bc, parent.GetHeader())
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
 	if err := bc.maybeAcceptBlock(block); err != nil {
 		logrus.Errorf("Insert Chain err: %s", err)
 		return err

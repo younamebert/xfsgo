@@ -164,6 +164,7 @@ func (storage *Storage) NewWriteBatch() *StorageWriteBatch {
 		batch: storage.db.NewWriteBatch(),
 	}
 }
+
 func (storage *Storage) CommitWriteBatch(batch *StorageWriteBatch) error {
 	return batch.batch.Flush()
 }

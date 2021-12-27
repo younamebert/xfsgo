@@ -203,7 +203,7 @@ func (ec *EpochContext) tryElect(genesis, parent *xfsgo.BlockHeader) error {
 		epochTrie, _ := avlmerkle.NewEpochTrie(common.Hash{}, ec.DposContext.DB())
 		ec.DposContext.SetEpoch(epochTrie)
 		ec.DposContext.SetValidators(sortedValidators)
-		logrus.Info("Come to new epoch", "prevEpoch", i, "nextEpoch", i+1)
+		logrus.Infof("Come to new epoch prevEpoch %s nextEpoch %s", i, i+1)
 	}
 	return nil
 }

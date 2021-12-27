@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"errors"
 	"xfsgo"
 	"xfsgo/avlmerkle"
 	"xfsgo/common"
@@ -60,3 +61,15 @@ type PoW interface {
 	// Hashrate returns the current mining hashrate of a PoW consensus engine.
 	Hashrate() float64
 }
+
+var (
+	ErrUnknownAncestor = errors.New("unknown ancestor")
+
+	// ErrFutureBlock is returned when a block's timestamp is in the future according
+	// to the current node.
+	ErrFutureBlock = errors.New("block in the future")
+
+	// ErrInvalidNumber is returned if a block's number doesn't equal it's parent's
+	// plus one.
+	ErrInvalidNumber = errors.New("invalid block number")
+)

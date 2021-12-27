@@ -241,6 +241,7 @@ func (m *Miner) GetGasLimit() *big.Int {
 func (m *Miner) GetMinStatus() bool {
 	return m.started
 }
+
 func (m *Miner) GetNext() bool {
 	return m.started
 }
@@ -318,11 +319,11 @@ func (m *Miner) waitworker() {
 				logrus.Error("Failed writing block to chain", "err", err)
 				continue
 			}
-
+			bcHash := block.HeaderHash()
 			m.eventBus.Publish(xfsgo.NewMinedBlockEvent{Block: block})
 			// Insert the block into the set of pending ones to wait for confirmations
-			m.unconfirmed.Insert(block.Header.Number().Uint64(), block.HeaderHash())
-			logrus.Info("Successfully sealed new block", "number", block.Header.Number(), "hash", block.HeaderHash())
+			m.unconfirmed.Insert(block.Header.Number().Uint64(), bcHash)
+			logrus.Infof("Successfully sealed new block number:%s hash:%s\n", block.Header.Number(), bcHash.Hex())
 		}
 	}
 }
@@ -359,6 +360,9 @@ out:
 
 			cugasUsed := m.current.header.GasUsed
 			m.current.header.GasUsed = gasused.Add(gasused, cugasUsed)
+			fmt.Println(43)
+			fmt.Printf("chainconfig:%v\n", m.chain.Config())
+			fmt.Println(12)
 			dpos.AccumulateRewards(m.chain.Config(), m.current.state, m.current.header)
 
 			stateTree.UpdateAll()
@@ -388,21 +392,21 @@ func (m *Miner) mintBlock(now int64) {
 			dpos.ErrMintFutureBlock,
 			dpos.ErrInvalidBlockValidator,
 			dpos.ErrInvalidMintBlockTime:
-			logrus.Debug("Failed to mint the block, while ", "err", err)
+			logrus.Debugf("Failed to mint the block, while err: %v\n", err)
 		default:
-			logrus.Error("Failed to mint the block", "err", err)
+			logrus.Errorf("Failed to mint the block err: %v\n", err)
 		}
 		return
 	}
 	work, err := m.createNewWork()
 	if err != nil {
-		logrus.Error("Failed to create the new work", "err", err)
+		logrus.Errorf("Failed to create the new work err:%v\n", err)
 		return
 	}
 
 	result, err := m.engine.Seal(m.chain, work.Block, m.quit)
 	if err != nil {
-		logrus.Error("Failed to seal the block", "err", err)
+		logrus.Errorf("Failed to seal the block err:%v\n", err)
 		return
 	}
 	m.recv <- &Result{work, result}
@@ -426,7 +430,7 @@ func (m *Miner) createNewWork() (*Work, error) {
 		Height:        num + 1,
 		GasLimit:      common.TxPoolGasLimit,
 		GasUsed:       new(big.Int),
-		HashPrevBlock: parent.HashPrevBlock(),
+		HashPrevBlock: parent.HeaderHash(),
 		Coinbase:      m.Coinbase,
 		Timestamp:     uint64(tstamp),
 	}
@@ -435,7 +439,6 @@ func (m *Miner) createNewWork() (*Work, error) {
 	if err := m.engine.Prepare(m.chain, header); err != nil {
 		return nil, fmt.Errorf("got error when preparing header, err: %s", err)
 	}
-
 	lastBlock := m.chain.CurrentBHeader()
 	lastStateRoot := lastBlock.StateRoot
 	stateTree := xfsgo.NewStateTree(m.stateDb, lastStateRoot.Bytes())
@@ -466,6 +469,7 @@ func (m *Miner) createNewWork() (*Work, error) {
 	stateTree.UpdateAll()
 	stateRootBytes := stateTree.Root()
 	stateRootHash := common.Bytes2Hash(stateRootBytes)
+
 	header.StateRoot = stateRootHash
 
 	// Create the new block to seal with the consensus engine
@@ -477,9 +481,12 @@ func (m *Miner) createNewWork() (*Work, error) {
 	work.receipts = append(work.receipts, res...)
 	work.Block.DposContext = work.dposContext
 
-	logrus.Info("Commit new mining work", "number", work.Block.Height(), "txs", len(work.txs), "elapsed", common.PrettyDuration(time.Since(tstart)))
+	logrus.Infof("Commit new mining work number %s  txs %s elapsed %s", work.Block.Height(), len(work.txs), common.PrettyDuration(time.Since(tstart)))
 	m.unconfirmed.Shift(work.Block.Height())
 
+	if err := stateTree.Commit(); err != nil {
+		return nil, err
+	}
 	return work, nil
 
 }

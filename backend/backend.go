@@ -87,8 +87,13 @@ func (c *chainSyncProtocol) Run(p p2p.Peer) error {
 func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 	var err error = nil
 
-	chainConfig := &params.ChainConfig{}
+	chainConfig := params.DposChainConfig
 
+	dposValis := make([]common.Address, 0)
+	dposValis = append(dposValis, common.B58ToAddress([]byte("ggg556gzNgbD6fsin1NAms4KqPxMxjYDD")))
+	chainConfig.Dpos = &params.DposConfig{
+		Validators: dposValis,
+	}
 	dpos := dpos.New(chainConfig.Dpos, config.ChainDB)
 	back := &Backend{
 		config:    config,
@@ -98,9 +103,10 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 
 	GenesisConfig := xfsgo.GenesisConfig{
 		StateDB: back.config.StateDB,
-		ChainDB: back.config.ChainDB,
+		ChainDB: config.ChainDB,
 		Debug:   config.Params.Debug,
 	}
+
 	geMain := xfsgo.NewGenesis(&GenesisConfig, chainConfig, xfsgo.GenesisBits)
 
 	back.eventBus = xfsgo.NewEventBus()
@@ -126,7 +132,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 			return nil, err
 		}
 		genesis.StateDB = back.config.StateDB
-		genesis.ChainDB = back.config.ChainDB
+		genesis.ChainDB = config.ChainDB
 		genesis.Debug = config.Params.Debug
 
 		genesis.Config.Dpos = chainConfig.Dpos
@@ -140,10 +146,10 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 
 	if back.blockchain, err = xfsgo.NewBlockChainN(
 		back.config.StateDB, back.config.ChainDB,
-		back.config.ExtraDB, back.eventBus,
-		config.Debug); err != nil {
+		back.config.ExtraDB, back.eventBus, chainConfig, config.Debug); err != nil {
 		return nil, err
 	}
+
 	back.wallet = xfsgo.NewWallet(back.config.KeysDB)
 	back.txPool = xfsgo.NewTxPool(
 		back.blockchain.CurrentStateTree,
@@ -165,6 +171,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 		Coinbase:   back.wallet.GetDefault(),
 		Numworkers: config.Numworkers,
 	}
+
 	back.miner = miner.NewMiner(
 		minerconfig,
 		back.wallet.All(),
@@ -174,7 +181,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 		back.txPool,
 		config.MinGasPrice,
 		common.TxPoolGasLimit,
-		back.engine,
+		dpos,
 		config.ChainDB)
 
 	logrus.Debugf("Initial miner: coinbase=%s, gasPrice=%s, gasLimit=%s",
@@ -190,6 +197,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 		back.txPool); err != nil {
 		return nil, err
 	}
+
 	back.syncMgr = newSyncMgr(
 		back.config.ProtocolVersion, back.config.NetworkID,
 		back.blockchain, back.eventBus, back.txPool, back.config.NodeSyncFlag)

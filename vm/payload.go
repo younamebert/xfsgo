@@ -3,6 +3,8 @@ package vm
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"io"
 	"reflect"
 	"xfsgo/common"
 	"xfsgo/common/ahash"
@@ -20,17 +22,25 @@ var (
 )
 
 type xvmPayload struct {
-	createFn  common.Hash
 	stateTree core.StateTree
 	address   common.Address
 	contract  BuiltinContract
+	resultBuf Buffer
 }
 
-func (p *xvmPayload) Create(input []byte) error {
-	return p.callFn(p.createFn, input)
+func (p *xvmPayload) goReturn(vs []reflect.Value) error {
+	for i := 0; i < len(vs); i++ {
+		if vs[i].IsNil() {
+			continue
+		}
+		if err, ok := vs[i].Interface().(error); ok {
+			return err
+		}
+		_, _ = p.resultBuf.Write(vs[i].Bytes())
+	}
+	return nil
 }
-
-func (p *xvmPayload) call(fn reflect.Method, input []byte) error {
+func (p *xvmPayload) call(fn reflect.Method, fnv reflect.Value, input []byte) error {
 	buf := NewBuffer(input)
 	mType := fn.Type
 	n := mType.NumIn()
@@ -39,48 +49,109 @@ func (p *xvmPayload) call(fn reflect.Method, input []byte) error {
 	for i := 1; i < n; i++ {
 		parameterType := mType.In(i)
 		switch parameterType.Name() {
-		case CTypeStringN:
+		case "CTypeString":
 			ssize, err := buf.ReadUint32()
 			if err != nil {
 				return err
 			}
-			s, err := buf.ReadString(int(ssize))
+			s, err := buf.ReadString(int(ssize.uint32()))
 			if err != nil {
 				return err
 			}
 			args = append(args, reflect.ValueOf(s))
-		case CTypeUint8N:
-
+		case "CTypeUint8":
+			m, err := buf.ReadUint8()
+			if err != nil {
+				return err
+			}
+			args = append(args, reflect.ValueOf(m))
+		case "CTypeUint256":
+			m, err := buf.ReadUint256()
+			if err != nil {
+				return err
+			}
+			args = append(args, reflect.ValueOf(m))
 		}
 	}
-
-	return nil
+	r := fnv.Call(args)
+	return p.goReturn(r)
 }
-func (p *xvmPayload) callFn(fn common.Hash, input []byte) error {
+func (p *xvmPayload) callFn(fn common.Hash, input []byte) (err error) {
 	ct := reflect.TypeOf(p.contract)
-	findMethod := func(hash common.Hash) (reflect.Method, bool) {
+	cv := reflect.ValueOf(p.contract)
+	cte := ct.Elem()
+	cve := cv.Elem()
+	findMethod := func(hash common.Hash) (reflect.Method, reflect.Value, bool) {
 		for i := 0; i < ct.NumMethod(); i++ {
 			sf := ct.Method(i)
 			aname := sf.Name
+
 			namehash := ahash.SHA256([]byte(aname))
 			if sf.Type.Kind() == reflect.Func && bytes.Equal(hash[:], namehash) {
-				return sf, true
+				mv := cv.MethodByName(aname)
+				return sf, mv, true
 			}
 		}
-		return reflect.Method{}, false
+		return reflect.Method{}, reflect.Value{}, false
 	}
-	if m, ok := findMethod(fn); ok {
-		if err := p.call(m, input); err != nil {
-			return err
+	if m, mv, ok := findMethod(fn); ok {
+		if err = p.call(m, mv, input); err != nil {
+			return
 		}
+		//for i := 0; i < cve.NumField(); i++ {
+		//
+		//	cvef := cve.Field(i)
+		//	cvef.Type()
+		//	fmt.Printf("cvf: %s\n", cvef)
+		//}
+		for i := 0; i < cte.NumField(); i++ {
+			ctef := cte.Field(i)
+			c := ctef.Tag.Get("contract")
+			if c == "storage" {
+				nameHash := ahash.SHA256([]byte(ctef.Name))
+				_ = cve
+				//fvalue := cve.FieldByName(ctef.Name)
+				cteft := ctef.Type
+				fmt.Printf("name: %s, hash: %x, type: %v\n", ctef.Name, nameHash[:], cteft)
+				//fvaluebs := fvalue.Bytes()
+				//fmt.Printf("name: %s, hash: %x, value: %x\n", ctef.Name, nameHash[:], fvaluebs[:])
+				//p.stateTree.SetState(p.address, nameHash[:], )
+			}
+
+		}
+		return
 	}
 	return errNotfoundMethod
 }
 
-func (p *xvmPayload) Call([]byte) error {
-	return nil
+func readCallMethod(r io.Reader) (m common.Hash, e error) {
+	var hashdata [32]byte
+	n, e := r.Read(hashdata[:])
+	if e != nil {
+		return common.Hash{}, e
+	}
+	if n != len(hashdata) {
+		return common.Hash{}, errors.New("eof")
+	}
+	copy(m[:], hashdata[:])
+	return
 }
 
+func (p *xvmPayload) exec(input []byte) error {
+	buf := bytes.NewBuffer(input)
+	fn, err := readCallMethod(buf)
+	if err != nil {
+		return err
+	}
+	return p.callFn(fn, buf.Bytes())
+}
+func (p *xvmPayload) Call(input []byte) error {
+	return p.exec(input)
+}
+
+func (p *xvmPayload) Create(input []byte) error {
+	return p.exec(input)
+}
 func makeKey(k []byte) (key [32]byte) {
 	keyhash := ahash.SHA256(k)
 	copy(key[:], keyhash)

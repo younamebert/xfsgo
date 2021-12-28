@@ -2,6 +2,7 @@ package vm
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"math/big"
 	"testing"
@@ -30,34 +31,58 @@ func newTestStateTree() *testStateTree {
 	return &testStateTree{}
 }
 
-func readHex2Bytes(s string) ([]byte, error) {
+func readBytes4hex(s string) ([]byte, error) {
 	return hex.DecodeString(s)
 }
-func mustReadHex2Bytes(s string) []byte {
-	var (
-		bs  []byte
-		err error
-	)
-
-	if bs, err = hex.DecodeString(s); err != nil {
+func mustReadBytes4hex(s string) []byte {
+	bs, err := readBytes4hex(s)
+	if err != nil {
 		panic(err)
 	}
 	return bs
 }
+func writeStringParams(w Buffer, s CTypeString) {
+	slen := len(s)
+	var slenbuf [8]byte
+	binary.LittleEndian.PutUint64(slenbuf[:], uint64(slen))
+	_, _ = w.Write(slenbuf[:])
+	_, _ = w.Write(s)
+}
+
+var (
+	tokenCode = []byte{
+		0xd0, 0x23, 0x01,
+	}
+	tokenCreateFnHash = mustReadBytes4hex("4759498ac2a719c619e2c8cf8ee60af2d2407425e95d308eb208425b2a6d427a")
+	tokenCreateParams = func(
+		name CTypeString,
+		symbol CTypeString,
+		decimals CTypeUint8,
+		totalSupply CTypeUint256) (d []byte) {
+		buf := NewBuffer(nil)
+		writeStringParams(buf, name)
+		writeStringParams(buf, symbol)
+		_, _ = buf.Write([]byte{byte(decimals)})
+		_, _ = buf.Write(totalSupply[:])
+		return buf.Bytes()
+	}
+	testAbTokenCreateParams = tokenCreateParams(
+		CTypeString("AbCoin"),
+		CTypeString("AB"),
+		18,
+		newUint256(new(big.Int).SetInt64(100)))
+)
+
 func TestXvm_Create(t *testing.T) {
 	st := newTestStateTree()
 	vm := NewXVM(st)
-	code, err := readHex2Bytes("d0230000014759498ac2a719c619e2c8cf8ee60af2d2407425e95d308eb208425b2a6d427a")
-	if err != nil {
+	inputBuf := bytes.NewBuffer(nil)
+	inputBuf.Write(tokenCode)
+	inputBuf.Write(tokenCreateFnHash)
+	inputBuf.Write(testAbTokenCreateParams)
+	if err := vm.Create(common.Address{}, inputBuf.Bytes()); err != nil {
 		t.Fatal(err)
 	}
-	buf := bytes.NewBuffer(code)
-	buf.Write(mustReadHex2Bytes("0500000000000000"))
-	buf.Write(mustReadHex2Bytes("0100000000000000"))
-	if err = vm.Create(common.Address{}, buf.Bytes()); err != nil {
-		t.Fatal(err)
-	}
-	//buf.Write(new bytes.NewBuffer(""))
 }
 
 func TestXvm_Run(t *testing.T) {

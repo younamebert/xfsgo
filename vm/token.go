@@ -7,11 +7,11 @@ import (
 
 type token struct {
 	BuiltinContract
-	name        CTypeString
-	symbol      CTypeString
-	decimals    CTypeUint8
-	totalSupply CTypeUint256
-	balances    map[CTypeAddress]CTypeUint256
+	name        CTypeString                   `contract:"storage"`
+	symbol      CTypeString                   `contract:"storage"`
+	decimals    CTypeUint8                    `contract:"storage"`
+	totalSupply CTypeUint256                  `contract:"storage"`
+	balances    map[CTypeAddress]CTypeUint256 `contract:"storage"`
 }
 
 func (t *token) Create(
@@ -48,15 +48,15 @@ func (t *token) TotalSupply() CTypeUint256 {
 func (t *token) BalanceOf(common.Address) CTypeUint256 {
 	return CTypeUint256{}
 }
-func (t *token) Transfer(common.Address, common.Address) bool {
-	return false
+func (t *token) Transfer(addr common.Address, val CTypeUint256) CTypeBool {
+	return CTypeBool(0)
 }
-func (t *token) TransferFrom(common.Address, common.Address, *big.Int) bool {
-	return false
+func (t *token) TransferFrom(common.Address, common.Address, *big.Int) CTypeBool {
+	return CTypeBool(0)
 }
-func (t *token) Approve(common.Address, *big.Int) bool {
-	return false
+func (t *token) Approve(common.Address, *big.Int) CTypeBool {
+	return CTypeBool(0)
 }
-func (t *token) Allowance(common.Address, common.Address) bool {
-	return false
+func (t *token) Allowance(common.Address, common.Address) CTypeBool {
+	return CTypeBool(0)
 }

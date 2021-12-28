@@ -1,10 +1,8 @@
 package vm
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
-	"io"
 	"xfsgo/common"
 	"xfsgo/core"
 	"xfsgo/crypto"
@@ -19,10 +17,6 @@ type VM interface {
 const (
 	magicNumberXVM = uint16(9168)
 )
-const (
-	typeXIP2 = uint8(0x01)
-	typeXIP3 = uint8(0x02)
-)
 
 var (
 	errUnknownMagicNumber  = errors.New("unknown magic number")
@@ -32,34 +26,30 @@ var (
 type xvm struct {
 	stateTree core.StateTree
 	builtin   map[uint8]BuiltinContract
+	returnBuf Buffer
 }
 
 func NewXVM(st core.StateTree) *xvm {
 	vm := &xvm{
 		stateTree: st,
 		builtin:   make(map[uint8]BuiltinContract),
+		returnBuf: NewBuffer(nil),
 	}
 	vm.registerBuiltinId(new(token))
 	return vm
 }
 
-func (vm *xvm) newXVMPayload(contract BuiltinContract, address common.Address, ch common.Hash) (*xvmPayload, error) {
+func (vm *xvm) newXVMPayload(contract BuiltinContract, address common.Address) (*xvmPayload, error) {
 	return &xvmPayload{
-		createFn:  ch,
 		address:   address,
 		stateTree: vm.stateTree,
 		contract:  contract,
+		resultBuf: vm.returnBuf,
 	}, nil
 }
-func (vm *xvm) readPayload(address common.Address, code []byte) (payload, error) {
-	m := binary.LittleEndian.Uint16(code[:4])
-	if m != magicNumberXVM {
-		return nil, errUnknownMagicNumber
-	}
-	id := code[4]
-	createfnhashbs := code[5 : 5+len(common.Hash{})]
+func (vm *xvm) createPayload(address common.Address, id uint8) (payload, error) {
 	if pk, exists := vm.builtin[id]; exists {
-		return vm.newXVMPayload(pk, address, common.Bytes2Hash(createfnhashbs))
+		return vm.newXVMPayload(pk, address)
 	}
 	return nil, errUnknownContractType
 }
@@ -68,40 +58,40 @@ func (vm *xvm) registerBuiltinId(b BuiltinContract) {
 		vm.builtin[b.BuiltinId()] = b
 	}
 }
-
-func readCode(buf io.Reader) ([]byte, error) {
-	var bs [4]byte
-	n, err := buf.Read(bs[:])
-	if err != nil {
-		return nil, err
+func (vm *xvm) readCode(code []byte, input []byte) (id uint8, err error) {
+	if code == nil && input != nil {
+		code = make([]byte, 3)
+		copy(code[:], input[:])
 	}
-	return bs[:n], err
+	if code == nil || len(code) < 3 {
+		return 0, errors.New("eof")
+	}
+	m := binary.LittleEndian.Uint16(code[:2])
+	if m != magicNumberXVM {
+		return 0, errUnknownMagicNumber
+	}
+	id = code[2]
+	return
 }
 func (vm *xvm) Run(addr common.Address, code []byte, input []byte) error {
-	inputBuf := bytes.NewBuffer(input)
-	var (
-		err    error
-		create bool
-	)
-	if code == nil {
-		create = true
-		code, err = readCode(inputBuf)
-		if err != nil {
-			return err
-		}
-	}
-	pl, err := vm.readPayload(addr, code)
+	id, err := vm.readCode(code, input)
 	if err != nil {
 		return err
 	}
-	if create {
-		if err = pl.Create(inputBuf.Bytes()); err != nil {
+	pl, err := vm.createPayload(addr, id)
+	if err != nil {
+		return err
+	}
+	if code == nil {
+		var realInput = make([]byte, len(input)-3)
+		copy(realInput[:], input[3:])
+		if err = pl.Create(realInput); err != nil {
 			return err
 		}
-	} else {
-		if err = pl.Call(inputBuf.Bytes()); err != nil {
-			return err
-		}
+		return nil
+	}
+	if err = pl.Call(input); err != nil {
+		return err
 	}
 	return nil
 }

@@ -53,11 +53,12 @@ func Test_makeOpNumString(t *testing.T) {
 }
 func TestVmc_Exec(t *testing.T) {
 	c := NewVMC()
-	data := NewBuffer(nil)
-	data.Write(makeOpNumUint32(OpPush, 3))
-	data.Write(makeOpNumString(OpPush, "abc"))
-	//if err := c.Exec(data.Bytes()); err != nil {
-	//	t.Fatal(err)
+
+	//data := NewBuffer(nil)
+	//n, err := data.Write([]byte("hello"))
+	//if err != nil {
+	//	return
 	//}
-	//c.Pop()
+	_ = c
+
 }

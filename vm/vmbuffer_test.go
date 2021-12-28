@@ -35,8 +35,7 @@ func TestBuffer_ReadString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(want[:], []byte(r)) {
+	if !bytes.Equal(want[:], r) {
 		t.Fatalf("want=%x, got=%x", want, []byte(r))
 	}
-
 }

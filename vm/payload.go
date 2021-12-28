@@ -19,7 +19,11 @@ type payload interface {
 var (
 	errNotfoundCreateFn = errors.New("notfound create function")
 	errNotfoundMethod   = errors.New("notfound method")
+	errUnsupportedType  = errors.New("unsupported type")
 )
+
+const contractTag = "contract"
+const contractStorage = "storage"
 
 type xvmPayload struct {
 	stateTree core.StateTree
@@ -76,6 +80,7 @@ func (p *xvmPayload) call(fn reflect.Method, fnv reflect.Value, input []byte) er
 	r := fnv.Call(args)
 	return p.goReturn(r)
 }
+
 func (p *xvmPayload) callFn(fn common.Hash, input []byte) (err error) {
 	ct := reflect.TypeOf(p.contract)
 	cv := reflect.ValueOf(p.contract)
@@ -106,18 +111,44 @@ func (p *xvmPayload) callFn(fn common.Hash, input []byte) (err error) {
 		//}
 		for i := 0; i < cte.NumField(); i++ {
 			ctef := cte.Field(i)
-			c := ctef.Tag.Get("contract")
-			if c == "storage" {
-				nameHash := ahash.SHA256([]byte(ctef.Name))
-				_ = cve
-				//fvalue := cve.FieldByName(ctef.Name)
-				cteft := ctef.Type
-				fmt.Printf("name: %s, hash: %x, type: %v\n", ctef.Name, nameHash[:], cteft)
+			c := ctef.Tag.Get(contractTag)
+			if c != contractStorage {
+				continue
 				//fvaluebs := fvalue.Bytes()
 				//fmt.Printf("name: %s, hash: %x, value: %x\n", ctef.Name, nameHash[:], fvaluebs[:])
 				//p.stateTree.SetState(p.address, nameHash[:], )
 			}
+			nameHash := ahash.SHA256([]byte(ctef.Name))
+			_ = cve
+			fvalue := cve.FieldByName(ctef.Name)
+			switch ctef.Type {
+			case reflect.TypeOf(CTypeUint8(0)),
+				reflect.TypeOf(CTypeUint16{}),
+				reflect.TypeOf(CTypeUint32{}),
+				reflect.TypeOf(CTypeUint64{}),
+				reflect.TypeOf(CTypeUint256{}),
+				reflect.TypeOf(CTypeString{}),
+				reflect.TypeOf(CTypeAddress{}):
+				fmt.Printf("name: %s, hash: %x, type: %v\n", ctef.Name, nameHash[:], ctef.Type)
+			default:
+				switch ctef.Type.Kind() {
+				case reflect.Map:
+					for _, k := range fvalue.MapKeys() {
+						v := fvalue.MapIndex(k)
+						fmt.Printf("name: %s, hash: %x, type: %v, val(k): %s, val(v): %x\n", ctef.Name, nameHash[:], ctef.Type, k., v)
+						//key := k.Convert(fvalue.Type().Key()) //.Convert(m.Type().Key())
+						//value := fvalue.MapIndex(k)
+						//value.Type()
+						//switch t := value.Interface().(type) {
+						//case CTypeAddress:
+						//	fmt.Printf("name: %s, hash: %x, type: %v, val: %s\n", ctef.Name, nameHash[:], ctef.Type, t.address())
+						//}
+					}
 
+				default:
+					return errUnsupportedType
+				}
+			}
 		}
 		return
 	}

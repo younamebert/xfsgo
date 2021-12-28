@@ -23,6 +23,8 @@ func (t *token) Create(
 	t.symbol = symbol
 	t.decimals = decimals
 	t.totalSupply = totalSupply
+	t.balances = make(map[CTypeAddress]CTypeUint256)
+	t.balances[CTypeAddress{0x01}] = CTypeUint256{0x02}
 	return nil
 }
 

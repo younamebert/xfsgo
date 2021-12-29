@@ -589,11 +589,6 @@ func calcBlockSubsidy(height uint64) *big.Int {
 func AccumulateRewards(stateTree *StateTree, header *BlockHeader) {
 	subsidy := calcBlockSubsidy(header.Height)
 
-	if header.GasUsed.Cmp(big.NewInt(0)) > 0 {
-		gas := common.NanoCoin2Atto(header.GasUsed)
-		subsidy.Add(subsidy, gas)
-	}
-
 	//logrus.Debugf("Current height of the blockchain %d, reward: %d", header.Height, subsidy)
 	stateTree.AddBalance(header.Coinbase, subsidy)
 }

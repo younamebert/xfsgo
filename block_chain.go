@@ -1030,7 +1030,6 @@ func (bc *BlockChain) ApplyTransaction(
 
 	// refundGas
 	remaining := new(big.Int).Mul(gas, tx.GasPrice)
-	// fmt.Printf("remaining:%v\n", remaining.String())
 	sender.AddBalance(remaining)
 	gp.AddGas(gas)
 	mgasused := new(big.Int).Sub(tx.GasLimit, gas)

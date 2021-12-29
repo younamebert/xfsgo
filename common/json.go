@@ -33,7 +33,8 @@ func (block BlocksMap) MapMerge() map[string]interface{} {
 	result["transactions_root"] = blockheader["transactions_root"]
 	result["receipts_root"] = blockheader["receipts_root"]
 	bitsStr := strconv.FormatInt(int64(blockheader["bits"].(float64)), 10)
-	result["bits"] = bitsStr
+	bits := Hex2Hash(bitsStr)
+	result["bits"] = bits.Hex()
 	result["nonce"] = blockheader["nonce"]
 	result["coinbase"] = blockheader["coinbase"]
 

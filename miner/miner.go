@@ -287,16 +287,17 @@ func (m *Miner) SetGasPrice(price *big.Int) error {
 
 func (m *Miner) mintLoop() {
 	ticker := time.NewTicker(time.Second).C
+out:
 	for {
 		select {
 		case now := <-ticker:
 			m.mintBlock(now.Unix())
 		case <-m.quitCh:
-			close(m.quitCh)
-			m.quitCh = make(chan struct{})
-			return
+			break out
 		}
 	}
+	m.wg.Done()
+	logrus.Info("Miner quit")
 }
 
 func (m *Miner) waitworker() {
@@ -312,9 +313,15 @@ func (m *Miner) waitworker() {
 
 			err := m.chain.WriteBlock(block)
 			if err != nil {
-				logrus.Error("Failed writing block to chain", "err", err)
+				logrus.Errorf("Failed writing block to chain err:%v", err)
 				continue
 			}
+
+			if _, err := block.DposContext.CommitTo(); err != nil {
+				logrus.Errorf("Failed writing block to chain DposContext err:%v", err)
+				continue
+			}
+
 			bcHash := block.HeaderHash()
 			m.eventBus.Publish(xfsgo.NewMinedBlockEvent{Block: block})
 			// Insert the block into the set of pending ones to wait for confirmations
@@ -380,6 +387,7 @@ func (m *Miner) mintBlock(now int64) {
 		return
 	}
 	err := engine.CheckValidator(m.chain.CurrentBlock(), now)
+	fmt.Printf("err:%v\n", err)
 	if err != nil {
 		switch err {
 		case dpos.ErrWaitForPrevBlock,
@@ -516,7 +524,7 @@ func (m *Miner) Start() {
 	if m.started || !m.canStart {
 		return
 	}
-	m.quit = make(chan struct{})
+	m.quitCh = make(chan struct{})
 	m.wg.Add(1)
 	go m.mintLoop()
 	m.LastStartTime = time.Now()
@@ -524,11 +532,11 @@ func (m *Miner) Start() {
 	m.shouldStart = true
 }
 
-func (self *Miner) Stop() {
+func (m *Miner) Stop() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.started {
-		close(m.quit)
+		close(m.quitCh)
 		m.wg.Wait()
 	}
 }
@@ -590,42 +598,42 @@ func (m *Miner) SetCoinbase(address common.Address) {
 }
 
 // mainLoop is the miner's main event loop, waiting for and reacting to synchronize events.
-func (m *Miner) mainLoop() {
-	startSub := m.eventBus.Subscript(xfsgo.SyncStartEvent{})
-	doneSub := m.eventBus.Subscript(xfsgo.SyncDoneEvent{})
-	failedSub := m.eventBus.Subscript(xfsgo.SyncFailedEvent{})
-	defer func() {
-		startSub.Unsubscribe()
-		doneSub.Unsubscribe()
-		failedSub.Unsubscribe()
-	}()
-out:
-	for {
-		select {
-		case <-startSub.Chan():
-			m.mu.Lock()
-			m.canStart = false
-			m.mu.Unlock()
-			m.Stop()
-		case <-failedSub.Chan():
-			m.mu.Lock()
-			m.canStart = true
-			m.mu.Unlock()
-			// if m.shouldStart {
-			// 	m.Start(m.numWorkers)
-			// }
-		case <-doneSub.Chan():
-			m.mu.Lock()
-			m.canStart = true
-			m.mu.Unlock()
+// func (m *Miner) mainLoop() {
+// 	startSub := m.eventBus.Subscript(xfsgo.SyncStartEvent{})
+// 	doneSub := m.eventBus.Subscript(xfsgo.SyncDoneEvent{})
+// 	failedSub := m.eventBus.Subscript(xfsgo.SyncFailedEvent{})
+// 	defer func() {
+// 		startSub.Unsubscribe()
+// 		doneSub.Unsubscribe()
+// 		failedSub.Unsubscribe()
+// 	}()
+// out:
+// 	for {
+// 		select {
+// 		case <-startSub.Chan():
+// 			m.mu.Lock()
+// 			m.canStart = false
+// 			m.mu.Unlock()
+// 			m.Stop()
+// 		case <-failedSub.Chan():
+// 			m.mu.Lock()
+// 			m.canStart = true
+// 			m.mu.Unlock()
+// 			// if m.shouldStart {
+// 			// 	m.Start(m.numWorkers)
+// 			// }
+// 		case <-doneSub.Chan():
+// 			m.mu.Lock()
+// 			m.canStart = true
+// 			m.mu.Unlock()
 
-			// if m.shouldStart {
-			// 	m.Start(m.numWorkers)
-			// }
-			break out
-		}
-	}
-}
+// 			// if m.shouldStart {
+// 			// 	m.Start(m.numWorkers)
+// 			// }
+// 			break out
+// 		}
+// 	}
+// }
 
 func (m *Miner) appendRemove(tx *xfsgo.Transaction) {
 	m.rmlock.Lock()

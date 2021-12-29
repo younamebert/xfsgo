@@ -83,11 +83,11 @@ func (set *unconfirmedBlocks) Shift(height uint64) {
 		header := set.chain.GetBlockByNumber(next.index).Header
 		switch {
 		case header == nil:
-			logrus.Warn("Failed to retrieve header of mined block", "number", next.index, "hash", next.hash)
+			logrus.Warnf("Failed to retrieve header of mined block number %s hash %s", next.index, next.hash.Hex())
 		case header.HashHex() == next.hash.Hex():
-			logrus.Info("🔗 block reached canonical chain", "number", next.index, "hash", next.hash)
+			logrus.Infof("block reached canonical chain number %s hash %s", next.index, next.hash.Hex())
 		default:
-			logrus.Info("⑂ block  became a side fork", "number", next.index, "hash", next.hash)
+			logrus.Infof("⑂ block  became a side fork number %s hash %s", next.index, next.hash.Hex())
 		}
 		// Drop the block out of the ring
 		if set.blocks.Value == set.blocks.Next().Value {

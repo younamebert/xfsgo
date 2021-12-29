@@ -30,6 +30,7 @@ var (
 )
 
 func NewEpochTrie(root common.Hash, db badger.IStorage) (*Tree, error) {
+	// hash := common.Bytes2Hash(root)
 	return NewTreeN(db, root[:], []byte(epochPrefix))
 	// return trie.NewTrieWithPrefix(root, epochPrefix, db)
 }
@@ -88,22 +89,27 @@ func NewDposContext(db badger.IStorage) (*DposContext, error) {
 func NewDposContextFromProto(db badger.IStorage, ctxProto *DposContextProto) (*DposContext, error) {
 	epochTrie, err := NewEpochTrie(ctxProto.EpochHash, db)
 	if err != nil {
+		fmt.Printf("prefix:%v root:%v\n", string(epochPrefix), ctxProto.EpochHash.Hex())
 		return nil, err
 	}
 	delegateTrie, err := NewDelegateTrie(ctxProto.DelegateHash, db)
 	if err != nil {
+		fmt.Printf("prefix:%v root:%v\n", string(delegatePrefix), ctxProto.DelegateHash.Hex())
 		return nil, err
 	}
 	voteTrie, err := NewVoteTrie(ctxProto.VoteHash, db)
 	if err != nil {
+		fmt.Printf("prefix:%v root:%v\n", string(votePrefix), ctxProto.VoteHash.Hex())
 		return nil, err
 	}
 	candidateTrie, err := NewCandidateTrie(ctxProto.CandidateHash, db)
 	if err != nil {
+		fmt.Printf("prefix:%v root:%v\n", string(candidatePrefix), ctxProto.CandidateHash.Hex())
 		return nil, err
 	}
 	mintCntTrie, err := NewMintCntTrie(ctxProto.MintCntHash, db)
 	if err != nil {
+		fmt.Printf("prefix:%v root:%v\n", string(mintCntPrefix), ctxProto.MintCntHash.Hex())
 		return nil, err
 	}
 	return &DposContext{

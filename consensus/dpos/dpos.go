@@ -404,12 +404,10 @@ func (d *Dpos) CheckValidator(lastBlock *xfsgo.Block, now int64) error {
 	if err := d.checkDeadline(lastBlock, now); err != nil {
 		return err
 	}
-
 	dposContext, err := avlmerkle.NewDposContextFromProto(d.db, lastBlock.Header.DposContext)
 	if err != nil {
 		return err
 	}
-
 	epochContext := &EpochContext{DposContext: dposContext}
 	validator, err := epochContext.lookupValidator(now)
 	if err != nil {
@@ -526,8 +524,6 @@ func updateMintCnt(parentBlockTime, currentBlockTime int64, validator common.Add
 	newEpoch := currentBlockTime / epochInterval
 	// still during the currentEpochID
 	if currentEpoch == newEpoch {
-
-		// currentMintCntTrie
 		currentMintCntTrie.Foreach(func(k, v []byte) {
 			// key := append(k, d.delegateTrie.prefix...)
 			cntBytes, ok := currentMintCntTrie.Get(append(currentEpochBytes, validator.Bytes()...))
@@ -537,16 +533,6 @@ func updateMintCnt(parentBlockTime, currentBlockTime int64, validator common.Add
 				cnt = int64(binary.BigEndian.Uint64(cntBytes)) + 1
 			}
 		})
-		// iter := trie.NewIterator(currentMintCntTrie.NodeIterator(currentEpochBytes))
-
-		// if iter.Next() {
-		// 	cntBytes := currentMintCntTrie.Get(append(currentEpochBytes, validator.Bytes()...))
-
-		// 	// not the first time to mint
-		// 	if cntBytes != nil {
-		// 		cnt = int64(binary.BigEndian.Uint64(cntBytes)) + 1
-		// 	}
-		// }
 	}
 
 	newCntBytes := make([]byte, 8)

@@ -41,6 +41,7 @@ const (
 	targetTimespan     = int64(time.Hour * 1 / time.Second)
 	endTimeV2          = int64(time.Hour * 1008 / time.Second)
 	endTimeV3          = int64(time.Hour * 168 / time.Second)
+	totalblocks        = endTimeV2/targetTimePerBlock + endTimeV3/targetTimePerBlock
 	//targetTimePerBlock = int64(time.Minute * 1 / time.Second)
 	//targetTimespan  = int64(time.Minute * 10 / time.Second)
 	//endTimeV1 = int64(time.Minute * 10 / time.Second)
@@ -840,13 +841,21 @@ func (bc *BlockChain) checkBlockHeaderSanity(prev, header *BlockHeader, blockHas
 	if current.Cmp(target) > 0 {
 		return fmt.Errorf("pow check err")
 	}
-	last, err := bc.calcNextRequiredBitsByHeight(prev.Height)
-	if err != nil {
-		return err
+
+	// v1 blocks 22180
+
+	if header.Height < 22180 {
+		return nil
+	} else if header.Height < uint64(totalblocks) {
+		last, err := bc.calcNextRequiredBitsByHeight(prev.Height)
+		if err != nil {
+			return err
+		}
+		if last != header.Bits {
+			return fmt.Errorf("pow check err")
+		}
 	}
-	if last != header.Bits {
-		return fmt.Errorf("pow check err")
-	}
+
 	return nil
 }
 

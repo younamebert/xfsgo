@@ -134,8 +134,10 @@ func (p *xvmPayload) callFn(fn common.Hash, input []byte) (err error) {
 				switch ctef.Type.Kind() {
 				case reflect.Map:
 					for _, k := range fvalue.MapKeys() {
-						v := fvalue.MapIndex(k)
-						fmt.Printf("name: %s, hash: %x, type: %v, val(k): %s, val(v): %x\n", ctef.Name, nameHash[:], ctef.Type, k., v)
+						tt :=
+						k.
+							v := fvalue.MapIndex(k)
+						fmt.Printf("name: %s, hash: %x, type: %v, val(k): %s, val(v): %x\n", ctef.Name, nameHash[:], ctef.Type, k.Bytes(), v)
 						//key := k.Convert(fvalue.Type().Key()) //.Convert(m.Type().Key())
 						//value := fvalue.MapIndex(k)
 						//value.Type()

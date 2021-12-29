@@ -73,7 +73,9 @@ func resetConfig(config *daemonConfig) {
 	}
 	if testnet {
 		config.backendParams.NetworkID = defaultTestNetworkId
-		config.nodeConfig.P2PBootstraps = defaultBootstrapNodes(defaultTestNetworkId)
+		if config.nodeConfig.P2PBootstraps == nil || len(config.nodeConfig.P2PBootstraps) == 0 {
+			config.nodeConfig.P2PBootstraps = defaultBootstrapNodes(defaultTestNetworkId)
+		}
 	}
 	if disableBootstrap {
 		config.nodeConfig.P2PBootstraps = make([]string, 0)

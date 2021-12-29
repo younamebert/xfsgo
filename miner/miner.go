@@ -387,7 +387,7 @@ func (m *Miner) mintBlock(now int64) {
 		return
 	}
 	err := engine.CheckValidator(m.chain.CurrentBlock(), now)
-	fmt.Printf("err:%v\n", err)
+
 	if err != nil {
 		switch err {
 		case dpos.ErrWaitForPrevBlock,

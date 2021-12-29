@@ -99,7 +99,8 @@ type Miner struct {
 	mu      sync.Mutex
 	rwmu    sync.RWMutex
 	started bool
-	quit    chan struct{}
+	quitCh  chan struct{}
+	stopper chan struct{}
 	// runningWorkers   []chan struct{}
 	// updateNumWorkers chan uint32
 	numWorkers      uint32
@@ -159,6 +160,7 @@ func NewMiner(config *Config,
 		engine:          engine,
 		chainDb:         chainDb,
 		recv:            make(chan *Result, resultQueueSize),
+		// quitCh:          make(chan struct{}, 1),
 	}
 	m.accounts = accounts
 	m.LoadLauncher()
@@ -283,23 +285,17 @@ func (m *Miner) SetGasPrice(price *big.Int) error {
 	return nil
 }
 
-func (m *Miner) DposStart() {
-	go m.mintLoop()
-}
-
 func (m *Miner) mintLoop() {
 	ticker := time.NewTicker(time.Second).C
 	for {
 		select {
 		case now := <-ticker:
 			m.mintBlock(now.Unix())
+		case <-m.quitCh:
+			close(m.quitCh)
+			m.quitCh = make(chan struct{})
+			return
 		}
-		// case <-m.stopper:
-		// 	close(self.quitCh)
-		// 	self.quitCh = make(chan struct{}, 1)
-		// 	self.stopper = make(chan struct{}, 1)
-		// 	return
-		// }
 	}
 }
 
@@ -340,7 +336,7 @@ func (m *Miner) updateWorker() {
 out:
 	for {
 		select {
-		case <-m.quit:
+		case <-m.quitCh:
 			// closeWorkers(m.numWorkers)
 			m.reset()
 			break out
@@ -360,9 +356,7 @@ out:
 
 			cugasUsed := m.current.header.GasUsed
 			m.current.header.GasUsed = gasused.Add(gasused, cugasUsed)
-			fmt.Println(43)
-			fmt.Printf("chainconfig:%v\n", m.chain.Config())
-			fmt.Println(12)
+
 			dpos.AccumulateRewards(m.chain.Config(), m.current.state, m.current.header)
 
 			stateTree.UpdateAll()
@@ -404,7 +398,7 @@ func (m *Miner) mintBlock(now int64) {
 		return
 	}
 
-	result, err := m.engine.Seal(m.chain, work.Block, m.quit)
+	result, err := m.engine.Seal(m.chain, work.Block, m.quitCh)
 	if err != nil {
 		logrus.Errorf("Failed to seal the block err:%v\n", err)
 		return
@@ -522,13 +516,21 @@ func (m *Miner) Start() {
 	if m.started || !m.canStart {
 		return
 	}
-
 	m.quit = make(chan struct{})
 	m.wg.Add(1)
 	go m.mintLoop()
 	m.LastStartTime = time.Now()
 	m.started = true
 	m.shouldStart = true
+}
+
+func (self *Miner) Stop() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.started {
+		close(m.quit)
+		m.wg.Wait()
+	}
 }
 
 func (m *Miner) StartMining(threads *int) error {
@@ -890,16 +892,16 @@ out:
 // 	logrus.Info("Miner quit")
 // }
 
-func (m *Miner) Stop() {
+// func (m *Miner) Stop() {
+// 	m.mu.Lock()
+// 	defer m.mu.Unlock()
+// 	if m.started {
+// 		close(m.quit)
+// 		m.wg.Wait()
+// 	}
+// }
+func (m *Miner) reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.started {
-		close(m.quit)
-		m.wg.Wait()
-	}
-}
-func (m *Miner) reset() {
-	//m.mu.Lock()
-	//defer m.mu.Unlock()
 	m.started = false
 }

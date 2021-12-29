@@ -103,6 +103,7 @@ type IBlockChain interface {
 	Boundaries() (uint64, uint64)
 	SetBoundaries(syncStatsOrigin, syncStatsHeight uint64) error
 	InsertChain(block *Block) error
+	HasBlockAndState(hash common.Hash) bool
 	// ApplyTransactions(stateTree *StateTree, header *BlockHeader, txs []*Transaction) (*big.Int, []*Receipt, error)
 	// ApplyTransaction(stateTree *StateTree, _ *BlockHeader, tx *Transaction, gp *GasPool, totalGas *big.Int) (*Receipt, error)
 	IntrinsicGas(data []byte) *big.Int
@@ -143,8 +144,8 @@ type BlockChain struct {
 	syncStatsHeight uint64       // Highest block number known when syncing started
 	syncStatsLock   sync.RWMutex // Lock protecting the sync stats fields
 
-	// engine consensus.Engine
-	// validator Validator // block and state validator interface
+	// engine    consensus.Engine
+	// validator validate.Validator // block and state validator interface
 	vmConfig vm.Config
 }
 
@@ -195,6 +196,20 @@ func (bc *BlockChain) GetBlockByNumber(num uint64) *Block {
 
 func (bc *BlockChain) Config() *params.ChainConfig {
 	return bc.chainConfig
+}
+
+// HasBlockAndState verifies block and associated states' presence in the local chain.
+func (bc *BlockChain) HasBlockAndState(hash common.Hash) bool {
+	// Check first that the block itself is known
+	block := bc.GetBlockByHash(hash)
+	if block == nil {
+		return false
+	}
+	// Ensure the associated state is also present
+	// bc.stateDB.
+	stateRoot := block.StateRoot()
+	_, err := NewStateTreeN(bc.stateDB, stateRoot.Bytes())
+	return err == nil
 }
 
 // getBlockByNumber get Block's Info about the Optimum chain

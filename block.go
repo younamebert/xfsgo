@@ -83,6 +83,10 @@ func (bHead *BlockHeader) HeaderHash() common.Hash {
 	return common.Bytes2Hash(hash)
 }
 
+func (bHead *BlockHeader) TxHash() common.Hash {
+	return bHead.TransactionsRoot
+}
+
 // BlockHeader hash to string
 func (bHead *BlockHeader) HashHex() string {
 	hash := bHead.HeaderHash()
@@ -119,6 +123,10 @@ func (bHead *BlockHeader) HashNoNonce() common.Hash {
 	data, _ := rawencode.Encode(header)
 	hash := ahash.SHA256(data)
 	return common.Bytes2Hash(hash)
+}
+
+func (bHead *BlockHeader) ReceiptsHash() common.Hash {
+	return bHead.ReceiptsRoot
 }
 
 type Block struct {

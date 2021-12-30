@@ -39,17 +39,18 @@ func NewXVM(st core.StateTree) *xvm {
 	return vm
 }
 
-func (vm *xvm) newXVMPayload(contract BuiltinContract, address common.Address) (*xvmPayload, error) {
+func (vm *xvm) newXVMPayload(contract BuiltinContract, address common.Address, code []byte) (*xvmPayload, error) {
 	return &xvmPayload{
+		code:      code,
 		address:   address,
 		stateTree: vm.stateTree,
 		contract:  contract,
 		resultBuf: vm.returnBuf,
 	}, nil
 }
-func (vm *xvm) createPayload(address common.Address, id uint8) (payload, error) {
+func (vm *xvm) createPayload(address common.Address, id uint8, code []byte) (payload, error) {
 	if pk, exists := vm.builtin[id]; exists {
-		return vm.newXVMPayload(pk, address)
+		return vm.newXVMPayload(pk, address, code)
 	}
 	return nil, errUnknownContractType
 }
@@ -58,36 +59,40 @@ func (vm *xvm) registerBuiltinId(b BuiltinContract) {
 		vm.builtin[b.BuiltinId()] = b
 	}
 }
-func (vm *xvm) readCode(code []byte, input []byte) (id uint8, err error) {
+func (vm *xvm) readCode(code []byte, input []byte) (c []byte, id uint8, err error) {
 	if code == nil && input != nil {
 		code = make([]byte, 3)
 		copy(code[:], input[:])
 	}
 	if code == nil || len(code) < 3 {
-		return 0, errors.New("eof")
+		return code, 0, errors.New("eof")
 	}
 	m := binary.LittleEndian.Uint16(code[:2])
 	if m != magicNumberXVM {
-		return 0, errUnknownMagicNumber
+		return code, 0, errUnknownMagicNumber
 	}
+	c = code
 	id = code[2]
 	return
 }
 func (vm *xvm) Run(addr common.Address, code []byte, input []byte) error {
-	id, err := vm.readCode(code, input)
+	var create = code == nil
+	code, id, err := vm.readCode(code, input)
 	if err != nil {
 		return err
 	}
-	pl, err := vm.createPayload(addr, id)
+	pl, err := vm.createPayload(addr, id, code)
 	if err != nil {
 		return err
 	}
-	if code == nil {
+	if create {
 		var realInput = make([]byte, len(input)-3)
 		copy(realInput[:], input[3:])
+
 		if err = pl.Create(realInput); err != nil {
 			return err
 		}
+		vm.stateTree.SetCode(addr, code)
 		return nil
 	}
 	if err = pl.Call(input); err != nil {

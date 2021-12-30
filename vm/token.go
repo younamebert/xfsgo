@@ -7,11 +7,11 @@ import (
 
 type token struct {
 	BuiltinContract
-	name        CTypeString                   `contract:"storage"`
-	symbol      CTypeString                   `contract:"storage"`
-	decimals    CTypeUint8                    `contract:"storage"`
-	totalSupply CTypeUint256                  `contract:"storage"`
-	balances    map[CTypeAddress]CTypeUint256 `contract:"storage"`
+	Name        CTypeString                   `contract:"storage" json:"name"`
+	Symbol      CTypeString                   `contract:"storage" json:"symbol"`
+	Decimals    CTypeUint8                    `contract:"storage" json:"decimals"`
+	TotalSupply CTypeUint256                  `contract:"storage" json:"totalSupply"`
+	Balances    map[CTypeAddress]CTypeUint256 `contract:"storage" json:"balances"`
 }
 
 func (t *token) Create(
@@ -19,12 +19,12 @@ func (t *token) Create(
 	symbol CTypeString,
 	decimals CTypeUint8,
 	totalSupply CTypeUint256) error {
-	t.name = name
-	t.symbol = symbol
-	t.decimals = decimals
-	t.totalSupply = totalSupply
-	t.balances = make(map[CTypeAddress]CTypeUint256)
-	t.balances[CTypeAddress{0x01}] = CTypeUint256{0x02}
+	t.Name = name
+	t.Symbol = symbol
+	t.Decimals = decimals
+	t.TotalSupply = totalSupply
+	t.Balances = make(map[CTypeAddress]CTypeUint256)
+	t.Balances[CTypeAddress{0x01}] = CTypeUint256{0x02}
 	return nil
 }
 
@@ -32,20 +32,20 @@ func (t *token) BuiltinId() uint8 {
 	return 0x01
 }
 
-func (t *token) Name() CTypeString {
-	return t.name
+func (t *token) GetName() CTypeString {
+	return t.Name
 }
 
-func (t *token) Symbol() CTypeString {
-	return t.symbol
+func (t *token) GetSymbol() CTypeString {
+	return t.Symbol
 }
 
-func (t *token) Decimals() CTypeUint8 {
-	return t.decimals
+func (t *token) GetDecimals() CTypeUint8 {
+	return t.Decimals
 }
 
-func (t *token) TotalSupply() CTypeUint256 {
-	return t.totalSupply
+func (t *token) GetTotalSupply() CTypeUint256 {
+	return t.TotalSupply
 }
 func (t *token) BalanceOf(common.Address) CTypeUint256 {
 	return CTypeUint256{}

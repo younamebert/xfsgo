@@ -2,6 +2,7 @@ package vm
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -26,6 +27,7 @@ const contractTag = "contract"
 const contractStorage = "storage"
 
 type xvmPayload struct {
+	code      []byte
 	stateTree core.StateTree
 	address   common.Address
 	contract  BuiltinContract
@@ -81,6 +83,83 @@ func (p *xvmPayload) call(fn reflect.Method, fnv reflect.Value, input []byte) er
 	return p.goReturn(r)
 }
 
+type stv struct {
+	reflect.StructField
+	nameHash [32]byte
+	val      reflect.Value
+}
+
+func findContractStorageValue(cte reflect.Type, cve reflect.Value) []*stv {
+	stvs := make([]*stv, 0)
+	for i := 0; i < cte.NumField(); i++ {
+		ctef := cte.Field(i)
+		c := ctef.Tag.Get(contractTag)
+		if c != contractStorage {
+			continue
+		}
+		nameHash := ahash.SHA256Array([]byte(ctef.Name))
+		fvalue := cve.FieldByName(ctef.Name)
+		if !fvalue.CanInterface() {
+			continue
+		}
+		stvs = append(stvs, &stv{
+			StructField: ctef,
+			nameHash:    nameHash,
+			val:         fvalue,
+		})
+	}
+	return stvs
+}
+func (p *xvmPayload) setupContract(stvs []*stv) (err error) {
+	for i := 0; i < len(stvs); i++ {
+		st := stvs[i]
+		data := p.stateTree.GetStateValue(p.address, st.nameHash)
+		if data == nil {
+			continue
+		}
+		switch st.Type {
+		case reflect.TypeOf(CTypeString{}):
+			cs := CTypeString{}
+			if err = json.Unmarshal(data, &cs); err != nil {
+				return
+			}
+			st.val.Set(reflect.ValueOf(cs))
+		case reflect.TypeOf(CTypeUint8(0)):
+			cs := CTypeUint8(0)
+			if err = json.Unmarshal(data, &cs); err != nil {
+				return
+			}
+			st.val.Set(reflect.ValueOf(cs))
+		case reflect.TypeOf(CTypeUint256{}):
+			cs := CTypeUint256{}
+			if err = json.Unmarshal(data, &cs); err != nil {
+				return
+			}
+			st.val.Set(reflect.ValueOf(cs))
+		}
+		fmt.Printf("name: %s, hash: %x, type: %v, val: %s\n", st.Name, st.nameHash[:], st.Type, "nil")
+	}
+	fmt.Println()
+	//fmt.Printf("name: %s, hash: %x, type: %v, val: %s\n", st.Name, st.nameHash[:], st.Type, "nil")
+	return
+}
+
+func (p *xvmPayload) updateContractState(stvs []*stv) (err error) {
+	for i := 0; i < len(stvs); i++ {
+		st := stvs[i]
+		fvalue := st.val
+		if !fvalue.CanInterface() {
+			continue
+		}
+		jb, err := json.Marshal(fvalue.Interface())
+		if err != nil {
+			return err
+		}
+		p.stateTree.SetState(p.address, st.nameHash, jb)
+		fmt.Printf("name: %s, hash: %x, type: %v, val: %s\n", st.Name, st.nameHash[:], st.Type, string(jb))
+	}
+	return
+}
 func (p *xvmPayload) callFn(fn common.Hash, input []byte) (err error) {
 	ct := reflect.TypeOf(p.contract)
 	cv := reflect.ValueOf(p.contract)
@@ -100,57 +179,15 @@ func (p *xvmPayload) callFn(fn common.Hash, input []byte) (err error) {
 		return reflect.Method{}, reflect.Value{}, false
 	}
 	if m, mv, ok := findMethod(fn); ok {
+		stvs := findContractStorageValue(cte, cve)
+		if err = p.setupContract(stvs); err != nil {
+			return
+		}
 		if err = p.call(m, mv, input); err != nil {
 			return
 		}
-		//for i := 0; i < cve.NumField(); i++ {
-		//
-		//	cvef := cve.Field(i)
-		//	cvef.Type()
-		//	fmt.Printf("cvf: %s\n", cvef)
-		//}
-		for i := 0; i < cte.NumField(); i++ {
-			ctef := cte.Field(i)
-			c := ctef.Tag.Get(contractTag)
-			if c != contractStorage {
-				continue
-				//fvaluebs := fvalue.Bytes()
-				//fmt.Printf("name: %s, hash: %x, value: %x\n", ctef.Name, nameHash[:], fvaluebs[:])
-				//p.stateTree.SetState(p.address, nameHash[:], )
-			}
-			nameHash := ahash.SHA256([]byte(ctef.Name))
-			_ = cve
-			fvalue := cve.FieldByName(ctef.Name)
-			switch ctef.Type {
-			case reflect.TypeOf(CTypeUint8(0)),
-				reflect.TypeOf(CTypeUint16{}),
-				reflect.TypeOf(CTypeUint32{}),
-				reflect.TypeOf(CTypeUint64{}),
-				reflect.TypeOf(CTypeUint256{}),
-				reflect.TypeOf(CTypeString{}),
-				reflect.TypeOf(CTypeAddress{}):
-				fmt.Printf("name: %s, hash: %x, type: %v\n", ctef.Name, nameHash[:], ctef.Type)
-			default:
-				switch ctef.Type.Kind() {
-				case reflect.Map:
-					for _, k := range fvalue.MapKeys() {
-						tt :=
-						k.
-							v := fvalue.MapIndex(k)
-						fmt.Printf("name: %s, hash: %x, type: %v, val(k): %s, val(v): %x\n", ctef.Name, nameHash[:], ctef.Type, k.Bytes(), v)
-						//key := k.Convert(fvalue.Type().Key()) //.Convert(m.Type().Key())
-						//value := fvalue.MapIndex(k)
-						//value.Type()
-						//switch t := value.Interface().(type) {
-						//case CTypeAddress:
-						//	fmt.Printf("name: %s, hash: %x, type: %v, val: %s\n", ctef.Name, nameHash[:], ctef.Type, t.address())
-						//}
-					}
-
-				default:
-					return errUnsupportedType
-				}
-			}
+		if err = p.updateContractState(stvs); err != nil {
+			return
 		}
 		return
 	}

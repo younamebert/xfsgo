@@ -2,6 +2,7 @@ package vm
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"math/big"
 	"xfsgo/common"
 )
@@ -19,26 +20,90 @@ func (t CTypeUint8) uint8() uint8 {
 	return uint8(t)
 }
 
+func (t CTypeUint8) Encode() (d []byte, err error) {
+	d = make([]byte, 1)
+	copy(d[:], []byte{byte(t)})
+	return
+}
+
+func (t *CTypeUint8) Decode(data []byte) (err error) {
+	tp := CTypeUint8(data[0])
+	*t = *&tp
+	return
+}
+
 func (t CTypeUint16) uint16() uint16 {
 	return binary.LittleEndian.Uint16(t[:])
+}
+
+func (t CTypeUint16) Encode() (d []byte, err error) {
+	d = make([]byte, len(t))
+	copy(d[:], t[:])
+	return
+}
+
+func (t CTypeUint16) Decode(data []byte) (err error) {
+	copy(t[:], data[:])
+	return
 }
 
 func (t CTypeUint32) uint32() uint32 {
 	return binary.LittleEndian.Uint32(t[:])
 }
+func (t CTypeUint32) Encode() (d []byte, err error) {
+	d = make([]byte, len(t))
+	copy(d[:], t[:])
+	return
+}
+func (t CTypeUint32) Decode(data []byte) (err error) {
+	copy(t[:], data[:])
+	return
+}
 
 func (t CTypeUint64) uint64() uint64 {
 	return binary.LittleEndian.Uint64(t[:])
 }
-
+func (t CTypeUint64) Encode() (d []byte, err error) {
+	d = make([]byte, len(t))
+	copy(d[:], t[:])
+	return
+}
 func (t CTypeUint256) bigInt() *big.Int {
 	return new(big.Int).SetBytes(t[:])
+}
+func (t CTypeUint256) MarshalText() (d []byte, err error) {
+	ds := hex.EncodeToString(t[:])
+	d = make([]byte, len(ds))
+	copy(d[:], ds[:])
+	return
 }
 
 func (t CTypeString) string() string {
 	return string(t)
 }
 
+func (t CTypeString) MarshalText() (d []byte, err error) {
+	ds := hex.EncodeToString(t[:])
+	d = make([]byte, len(ds))
+	copy(d[:], ds[:])
+	return
+}
+func (t *CTypeString) UnmarshalText(text []byte) error {
+	*t = make([]byte, len(text))
+	copy(*t, text)
+	return nil
+}
+func (t CTypeAddress) MarshalText() (d []byte, err error) {
+	ds := hex.EncodeToString(t[:])
+	d = make([]byte, len(ds))
+	copy(d[:], ds[:])
+	return
+}
+
+func (t CTypeAddress) UnmarshalText(text []byte) error {
+	copy(t[:], text)
+	return nil
+}
 func (t CTypeAddress) address() common.Address {
 	return common.Bytes2Address(t[:])
 }

@@ -11,4 +11,5 @@ type StateTree interface {
 	GetCode(common.Address) []byte
 	SetState(common.Address, [32]byte, []byte)
 	GetStateValue(common.Address, [32]byte) []byte
+	SetCode(addr common.Address, code []byte)
 }

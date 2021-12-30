@@ -181,6 +181,10 @@ func (so *StateObj) GetNonce() uint64 {
 func (so *StateObj) GetExtra() []byte {
 	return so.extra
 }
+
+func (so *StateObj) SetCode(code []byte) {
+	so.code = code
+}
 func (so *StateObj) SetState(key [32]byte, value []byte) {
 	so.cacheStorage[key] = value
 }
@@ -341,7 +345,12 @@ func (st *StateTree) SetState(addr common.Address, key [32]byte, value []byte) {
 		obj.SetState(key, value)
 	}
 }
-
+func (st *StateTree) SetCode(addr common.Address, code []byte) {
+	obj := st.GetOrNewStateObj(addr)
+	if obj != nil {
+		obj.SetCode(code)
+	}
+}
 func (st *StateTree) GetCode(addr common.Address) []byte {
 	obj := st.GetOrNewStateObj(addr)
 	if obj != nil {

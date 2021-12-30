@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"runtime"
 	"sync"
 	"time"
 	"xfsgo"
@@ -35,33 +34,34 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	// hpsUpdateSecs is the number of seconds to wait in between each
-	// update to the hashes per second monitor.
-	hashUpdateSecs = 1
+// const (
+// 	// hpsUpdateSecs is the number of seconds to wait in between each
+// 	// update to the hashes per second monitor.
+// 	hashUpdateSecs = 1
 
-	// hashUpdateSec is the number of seconds each worker waits in between
-	// notifying the speed monitor with how many hashes have been completed
-	// while they are actively searching for a solution.  This is done to
-	// reduce the amount of syncs between the workers that must be done to
-	// keep track of the hashes per second.
-	hpsUpdateSecs = 10
+// 	// hashUpdateSec is the number of seconds each worker waits in between
+// 	// notifying the speed monitor with how many hashes have been completed
+// 	// while they are actively searching for a solution.  This is done to
+// 	// reduce the amount of syncs between the workers that must be done to
+// 	// keep track of the hashes per second.
+// 	hpsUpdateSecs = 10
 
-	// maxNonce is the maximum value a nonce can be in a block header.
-	maxNonce = ^uint32(0) // 2^32 - 1
+// 	// maxNonce is the maximum value a nonce can be in a block header.
+// 	maxNonce = ^uint32(0) // 2^32 - 1
 
-	// maxExtraNonce is the maximum value an extra nonce used in a coinbase
-	// transaction can be.
-	maxExtraNonce = ^uint64(0) // 2^64 - 1
-)
+// 	// maxExtraNonce is the maximum value an extra nonce used in a coinbase
+// 	// transaction can be.
+// 	maxExtraNonce = ^uint64(0) // 2^64 - 1
+// )
 
-var (
-	hashRateLoopIntervalSec = 1
-	progressReportTime      = 10 * time.Second
-	maxWorkers              = uint32(255)
-	defaultNumWorkers       = uint32(runtime.NumCPU())
-	applyTransactionsErr    = errors.New("apply transaction err")
-)
+// var (
+// 	hashRateLoopIntervalSec = 1
+// 	progressReportTime      = 10 * time.Second
+// 	maxWorkers              = uint32(255)
+// 	defaultNumWorkers       = uint32(runtime.NumCPU())
+//  applyTransactionsErr = errors.New("apply transaction err")
+
+// )
 
 const (
 	miningLogAtDepth = 5
@@ -100,27 +100,27 @@ type Miner struct {
 	rwmu    sync.RWMutex
 	started bool
 	quitCh  chan struct{}
-	stopper chan struct{}
+	sealCh  chan struct{}
 	// runningWorkers   []chan struct{}
 	// updateNumWorkers chan uint32
-	numWorkers      uint32
-	eventBus        *xfsgo.EventBus
-	canStart        bool
-	shouldStart     bool
-	pool            *xfsgo.TxPool
-	chain           xfsgo.IBlockChain
-	stateDb         badger.IStorage
-	accounts        map[common.Address]*ecdsa.PrivateKey
-	gasPrice        *big.Int
-	gasLimit        *big.Int
-	LastStartTime   time.Time
-	rmlock          sync.RWMutex
-	remove          map[common.Hash]*xfsgo.Transaction
-	wg              sync.WaitGroup
-	workerWg        sync.WaitGroup
-	runningHashRate chan common.HashRate
-	lastHashRate    common.HashRate
-	reportHashes    chan uint64
+	numWorkers    uint32
+	eventBus      *xfsgo.EventBus
+	canStart      bool
+	shouldStart   bool
+	pool          *xfsgo.TxPool
+	chain         xfsgo.IBlockChain
+	stateDb       badger.IStorage
+	accounts      map[common.Address]*ecdsa.PrivateKey
+	gasPrice      *big.Int
+	gasLimit      *big.Int
+	LastStartTime time.Time
+	rmlock        sync.RWMutex
+	remove        map[common.Hash]*xfsgo.Transaction
+	wg            sync.WaitGroup
+	// workerWg        sync.WaitGroup
+	// runningHashRate chan common.HashRate
+	// lastHashRate    common.HashRate
+	// reportHashes    chan uint64
 
 	engine      consensus.Engine
 	chainDb     badger.IStorage
@@ -146,21 +146,22 @@ func NewMiner(config *Config,
 		accounts:   make(map[common.Address]*ecdsa.PrivateKey),
 		numWorkers: 0,
 		// updateNumWorkers: make(chan uint32),
-		pool:            pool,
-		canStart:        true,
-		shouldStart:     false,
-		started:         false,
-		eventBus:        eventBus,
-		gasLimit:        gasLimit,
-		gasPrice:        gasPrice,
-		remove:          make(map[common.Hash]*xfsgo.Transaction),
-		reportHashes:    make(chan uint64, 1),
-		runningHashRate: make(chan common.HashRate),
-		unconfirmed:     newUnconfirmedBlocks(chain, miningLogAtDepth),
-		engine:          engine,
-		chainDb:         chainDb,
-		recv:            make(chan *Result, resultQueueSize),
-		// quitCh:          make(chan struct{}, 1),
+		pool:        pool,
+		canStart:    true,
+		shouldStart: false,
+		started:     false,
+		eventBus:    eventBus,
+		gasLimit:    gasLimit,
+		gasPrice:    gasPrice,
+		remove:      make(map[common.Hash]*xfsgo.Transaction),
+		// reportHashes:    make(chan uint64, 1),
+		// runningHashRate: make(chan common.HashRate),
+		unconfirmed: newUnconfirmedBlocks(chain, miningLogAtDepth),
+		engine:      engine,
+		chainDb:     chainDb,
+		recv:        make(chan *Result, resultQueueSize),
+		quitCh:      make(chan struct{}, 1),
+		sealCh:      make(chan struct{}, 1),
 	}
 	m.accounts = accounts
 	m.LoadLauncher()
@@ -184,6 +185,10 @@ func (m *Miner) isValidator() (common.Address, error) {
 func (m *Miner) SetValidator(addr common.Address) bool {
 	m.Validator = addr
 	return true
+}
+
+func (m *Miner) HashRate() string {
+	return "0"
 }
 
 func (m *Miner) update() {
@@ -248,14 +253,14 @@ func (m *Miner) GetNext() bool {
 	return m.started
 }
 
-func (m *Miner) RunningHashRate() common.HashRate {
-	select {
-	case r := <-m.runningHashRate:
-		return r
-	default:
-	}
-	return m.lastHashRate
-}
+// func (m *Miner) RunningHashRate() common.HashRate {
+// 	select {
+// 	case r := <-m.runningHashRate:
+// 		return r
+// 	default:
+// 	}
+// 	return m.lastHashRate
+// }
 
 func (m *Miner) SetGasLimit(limit *big.Int) error {
 	m.rwmu.Lock()
@@ -293,6 +298,10 @@ out:
 		case now := <-ticker:
 			m.mintBlock(now.Unix())
 		case <-m.quitCh:
+			close(m.sealCh)
+			m.started = false
+			m.quitCh = make(chan struct{}, 1)
+			m.sealCh = make(chan struct{}, 1)
 			break out
 		}
 	}
@@ -324,6 +333,7 @@ func (m *Miner) waitworker() {
 
 			bcHash := block.HeaderHash()
 			m.eventBus.Publish(xfsgo.NewMinedBlockEvent{Block: block})
+			m.eventBus.Publish(xfsgo.NewBlockEvent{Block: block})
 			// Insert the block into the set of pending ones to wait for confirmations
 			m.unconfirmed.Insert(block.Header.Number().Uint64(), bcHash)
 			logrus.Infof("Successfully sealed new block number:%s hash:%s\n", block.Header.Number(), bcHash.Hex())
@@ -339,16 +349,20 @@ func (m *Miner) getStateTree() *xfsgo.StateTree {
 
 func (m *Miner) updateWorker() {
 	txPreEventSub := m.eventBus.Subscript(xfsgo.TxPreEvent{})
+	newBlockEventSub := m.eventBus.Subscript(xfsgo.NewBlockEvent{})
+	defer newBlockEventSub.Unsubscribe()
 	defer txPreEventSub.Unsubscribe()
-out:
+
 	for {
 		select {
-		case <-m.quitCh:
-			// closeWorkers(m.numWorkers)
-			m.reset()
-			break out
+		case <-newBlockEventSub.Chan():
+			close(m.sealCh)
+			m.sealCh = make(chan struct{})
 		case e := <-txPreEventSub.Chan():
-			event := e.(xfsgo.TxPreEvent)
+			event, ok := e.(xfsgo.TxPreEvent)
+			if !ok {
+				return
+			}
 			Tx := event.Tx
 			_ = m.pool.Add(Tx)
 
@@ -358,8 +372,11 @@ out:
 
 			committx := make([]*xfsgo.Transaction, 0)
 			ignoretxs := make(map[common.Address]struct{})
-			gasused, res, _ := m.applyTransactions(
+			gasused, res, err := m.applyTransactions(
 				m.current.state, m.current.header, txs, ignoretxs, &committx)
+			if err != nil {
+				m.doRemove()
+			}
 
 			cugasUsed := m.current.header.GasUsed
 			m.current.header.GasUsed = gasused.Add(gasused, cugasUsed)
@@ -371,11 +388,8 @@ out:
 			m.current.receipts = append(m.current.receipts, res...)
 			m.current.Block.Transactions = m.current.txs
 			m.current.Block.Receipts = m.current.receipts
-		}
 
-		m.workerWg.Wait()
-		m.wg.Done()
-		logrus.Info("Miner quit")
+		}
 	}
 }
 
@@ -406,7 +420,7 @@ func (m *Miner) mintBlock(now int64) {
 		return
 	}
 
-	result, err := m.engine.Seal(m.chain, work.Block, m.quitCh)
+	result, err := m.engine.Seal(m.chain, work.Block, m.sealCh)
 	if err != nil {
 		logrus.Errorf("Failed to seal the block err:%v\n", err)
 		return
@@ -462,28 +476,27 @@ func (m *Miner) createNewWork() (*Work, error) {
 	gasused, res, err := m.applyTransactions(
 		stateTree, header, pending, ignoretxs, &committx)
 	if err != nil {
-		return nil, applyTransactionsErr
+		return nil, fmt.Errorf("apply transaction err:%v", err)
 	}
 
 	header.GasUsed.Set(gasused)
 
-	dpos.AccumulateRewards(m.chain.Config(), stateTree, header)
-	stateTree.UpdateAll()
+	// dpos.AccumulateRewards(m.chain.Config(), stateTree, header)
 	stateRootBytes := stateTree.Root()
 	stateRootHash := common.Bytes2Hash(stateRootBytes)
 
 	header.StateRoot = stateRootHash
-
 	// Create the new block to seal with the consensus engine
 	block, err := m.engine.Finalize(m.chain, header, stateTree, committx, work.receipts, work.dposContext)
 	if err != nil {
 		return nil, fmt.Errorf("got error when finalize block for sealing, err: %s", err)
 	}
+	stateTree.UpdateAll()
 	work.Block = block
 	work.receipts = append(work.receipts, res...)
 	work.Block.DposContext = work.dposContext
 
-	logrus.Infof("Commit new mining work number %s  txs %s elapsed %s", work.Block.Height(), len(work.txs), common.PrettyDuration(time.Since(tstart)))
+	logrus.Infof("Commit new mining work number %v  txs %v elapsed %v", work.Block.Height(), len(work.txs), common.PrettyDuration(time.Since(tstart)))
 	m.unconfirmed.Shift(work.Block.Height())
 
 	if err := stateTree.Commit(); err != nil {
@@ -524,7 +537,7 @@ func (m *Miner) Start() {
 	if m.started || !m.canStart {
 		return
 	}
-	m.quitCh = make(chan struct{})
+	// m.quitCh = make(chan struct{})
 	m.wg.Add(1)
 	go m.mintLoop()
 	m.LastStartTime = time.Now()
@@ -567,7 +580,6 @@ func (m *Miner) StartMining(threads *int) error {
 		if !isaccount {
 			return fmt.Errorf("coinbase account unavailable locally")
 		}
-		// crypto.ECDSASign(,prikey)
 		dpos.Authorize(validator, m.SignHash)
 	}
 	go m.Start()
@@ -577,7 +589,7 @@ func (m *Miner) StartMining(threads *int) error {
 func (m *Miner) SignHash(account common.Address, hash []byte) ([]byte, error) {
 	prikey, isaccount := m.accounts[account]
 	if !isaccount {
-		return nil, fmt.Errorf("Coinbase account unavailable locally")
+		return nil, fmt.Errorf("coinbase account unavailable locally addr:%v", account.B58String())
 	}
 	return crypto.ECDSASign(hash, prikey)
 }
@@ -598,42 +610,6 @@ func (m *Miner) SetCoinbase(address common.Address) {
 }
 
 // mainLoop is the miner's main event loop, waiting for and reacting to synchronize events.
-// func (m *Miner) mainLoop() {
-// 	startSub := m.eventBus.Subscript(xfsgo.SyncStartEvent{})
-// 	doneSub := m.eventBus.Subscript(xfsgo.SyncDoneEvent{})
-// 	failedSub := m.eventBus.Subscript(xfsgo.SyncFailedEvent{})
-// 	defer func() {
-// 		startSub.Unsubscribe()
-// 		doneSub.Unsubscribe()
-// 		failedSub.Unsubscribe()
-// 	}()
-// out:
-// 	for {
-// 		select {
-// 		case <-startSub.Chan():
-// 			m.mu.Lock()
-// 			m.canStart = false
-// 			m.mu.Unlock()
-// 			m.Stop()
-// 		case <-failedSub.Chan():
-// 			m.mu.Lock()
-// 			m.canStart = true
-// 			m.mu.Unlock()
-// 			// if m.shouldStart {
-// 			// 	m.Start(m.numWorkers)
-// 			// }
-// 		case <-doneSub.Chan():
-// 			m.mu.Lock()
-// 			m.canStart = true
-// 			m.mu.Unlock()
-
-// 			// if m.shouldStart {
-// 			// 	m.Start(m.numWorkers)
-// 			// }
-// 			break out
-// 		}
-// 	}
-// }
 
 func (m *Miner) appendRemove(tx *xfsgo.Transaction) {
 	m.rmlock.Lock()
@@ -702,7 +678,7 @@ func (m *Miner) applyTransactions(
 				ignoreTxs[txfrom] = struct{}{}
 				continue
 			}
-			logrus.Warnf("Miner apply transaction err will be remove: %s", err)
+			logrus.Warnf("Miner  will be remove: %s", err)
 			m.appendRemove(tx)
 			stateTree.Set(snap)
 			m.current.dposContext.RevertToSnapShot(dposSnap)
@@ -717,199 +693,8 @@ func (m *Miner) applyTransactions(
 	return new(big.Int).SetUint64(totalUsedGas), receipts, nil
 }
 
-// func (m *Miner) generateBlocks(num uint32, quit chan struct{}, report reportFn) {
-// 	ticker := time.NewTicker(time.Second * hashUpdateSecs)
-// 	defer ticker.Stop()
-
-// out:
-// 	for {
-// 		select {
-// 		case <-quit:
-// 			break out
-// 		default:
-// 		}
-// 		txs := m.pool.GetTransactions()
-
-// 		xfsgo.SortByPriceAndNonce(txs)
-// lastBlock := m.chain.CurrentBHeader()
-// lastStateRoot := lastBlock.StateRoot
-// stateTree := xfsgo.NewStateTree(m.stateDb, lastStateRoot.Bytes())
-// startTime := time.Now()
-// block, err := m.mimeBlockWithParent(stateTree, lastBlock, m.Coinbase, txs, quit, ticker, report)
-// if err != nil {
-// 	switch err {
-// 	case applyTransactionsErr:
-// 		m.doRemove()
-// 	case xfsgo.ErrDifficultyOverflow:
-// 		return
-// 	default:
-// 		continue
-// 	}
-// }
-// if block == nil {
-// 	continue out
-// }
-// timeused := time.Now().Sub(startTime)
-
-// hash := block.HeaderHash()
-// workload := xfsgo.CalcWorkloadByBits(block.Bits())
-// workloadUint64 := workload.Uint64()
-// rate := float64(workloadUint64) / timeused.Seconds()
-// hashrate := common.HashRate(rate)
-// logrus.Infof("Sussessfully sealed new block: height=%d, hash=0x%x, txcount=%d, used=%fs, rate=%s",
-// 	block.Height(), hash[len(hash)-4:], len(block.Transactions), timeused.Seconds(), hashrate)
-// 		if err = stateTree.Commit(); err != nil {
-// 			logrus.Warnln("State tree commit err: ", err)
-// 			continue out
-// 		}
-// 		if err = m.chain.WriteBlock(block); err != nil {
-// 			logrus.Warnln("Write block err: ", err)
-// 			continue out
-// 		}
-// 		//sr := block.StateRoot()
-// 		//logrus.Debugf("successfully Write new block, height=%d, hash=0x%x, workerId=%-3d", block.Height(), hash[len(hash)-4:], num)
-// 		//st := xfsgo.NewStateTree(m.stateDb, sr.Bytes())
-// 		//balance := st.GetBalance(m.Coinbase)
-// 		//logrus.Infof("current coinbase: %s, balance: %d", m.Coinbase.B58String(), balance)
-// 		m.eventBus.Publish(xfsgo.NewMinedBlockEvent{Block: block})
-// 	}
-// 	m.workerWg.Done()
-// }
-
-func closeWorkers(cs []chan struct{}) {
-	for _, c := range cs {
-		close(c)
-	}
-}
-
 func (m *Miner) LoadLauncher() {
 	go m.updateWorker()
 	go m.waitworker()
 	m.createNewWork()
-}
-
-func (m *Miner) hashRateLoop(close chan struct{}) {
-	//var hashesPerSec float64
-	var (
-		totalHashes  uint64
-		hashesPerSec float64
-	)
-	intervalNumber := time.Duration(hashRateLoopIntervalSec)
-	ticker := time.NewTicker(time.Second * intervalNumber)
-	defer ticker.Stop()
-out:
-	for {
-		select {
-		// Periodic updates from the workers with how many hashes they
-		// have performed.
-		case numHashes := <-m.reportHashes:
-			totalHashes += numHashes
-		// Time to update the hashes per second.
-		case <-ticker.C:
-			hashPerSec := float64(totalHashes) / float64(hashRateLoopIntervalSec)
-			if hashesPerSec == 0 {
-				hashesPerSec = hashPerSec
-			}
-			hashesPerSec = (hashesPerSec + hashPerSec) / 2
-			totalHashes = 0
-			m.lastHashRate = common.HashRate(hashesPerSec)
-		case m.runningHashRate <- common.HashRate(hashesPerSec):
-		case <-close:
-			break out
-		}
-	}
-}
-
-// func (m *Miner) miningWorkerController(worker uint32) {
-// 	var runningWorkers []chan struct{}
-// 	hashrateloopchan := make(chan struct{})
-// 	defer close(hashrateloopchan)
-// 	go m.hashRateLoop(hashrateloopchan)
-
-// 	var reporting int32
-// 	var lastReportTime time.Time
-// 	report := func(now time.Time, lastblock *xfsgo.BlockHeader) {
-// 		if !atomic.CompareAndSwapInt32(&reporting, 0, 1) {
-// 			return
-// 		}
-// 		defer atomic.StoreInt32(&reporting, 0)
-// 		if now.Sub(lastReportTime) < (progressReportTime) {
-// 			return
-// 		}
-// 		targetHeight := lastblock.Height + 1
-// 		bits, _ := m.chain.CalcNextRequiredBitsByHeight(lastblock.Height)
-// workLoad := xfsgo.CalcWorkloadByBits(bits)
-// hashRate := m.RunningHashRate()
-// hashRateInt := new(big.Int).SetInt64(int64(hashRate))
-// estimateTimeStr := "long"
-// if hashRateInt.Sign() > 0 {
-// 	estimateTime := new(big.Int).Div(workLoad, hashRateInt)
-// 	estimateTimeStr = fmt.Sprintf("%ds", estimateTime)
-// }
-// logrus.Infof("Generating new block: targetHeight=%d, targetBits=%d, hashRate=%s, estimate=%s, works=%d",
-// 		targetHeight, bits, hashRate, estimateTimeStr, len(runningWorkers))
-// 	lastReportTime = now
-// }
-// launchWorkers := func(numWorkers uint32) {
-// 	logrus.Infof("Launch workers count=%d", numWorkers)
-
-// 	for i := uint32(0); i < numWorkers; i++ {
-// 		quit := make(chan struct{})
-// 		runningWorkers = append(runningWorkers, quit)
-// 		//logrus.Debugf("Start-up woker id=%-3d", i)
-// 		m.workerWg.Add(1)
-// 		go m.generateBlocks(i, quit, report)
-// 	}
-// }
-// runningWorkers = make([]chan struct{}, 0)
-// launchWorkers(worker)
-// txPreEventSub := m.eventBus.Subscript(xfsgo.TxPreEvent{})
-// defer txPreEventSub.Unsubscribe()
-// out:
-// for {
-// 	select {
-// 	case <-m.quit:
-// 		closeWorkers(runningWorkers)
-// 		m.reset()
-// 		break out
-// 	case e := <-txPreEventSub.Chan():
-// 		event := e.(xfsgo.TxPreEvent)
-// 		Tx := event.Tx
-// 		_ = m.pool.Add(Tx)
-// 	case targetNum := <-m.updateNumWorkers:
-// 		numRunning := uint32(len(runningWorkers))
-// 		if targetNum == numRunning {
-// 			continue
-// 		}
-// 		logrus.Debugf("Update worker: targetNum=%d, currentNum=%d", targetNum, numRunning)
-// 			if targetNum > numRunning {
-// 				launchWorkers(targetNum - numRunning)
-// 				continue
-// 			}
-// 			for i := numRunning - 1; i >= targetNum; i-- {
-// 				close(runningWorkers[i])
-// 				runningWorkers[i] = nil
-// 				runningWorkers = runningWorkers[:i]
-// 			}
-// 			logrus.Infof("Success update worker: targetNum=%d, runningWorkers=%d", targetNum, len(runningWorkers))
-// 		}
-// 	}
-
-// 	m.workerWg.Wait()
-// 	m.wg.Done()
-// 	logrus.Info("Miner quit")
-// }
-
-// func (m *Miner) Stop() {
-// 	m.mu.Lock()
-// 	defer m.mu.Unlock()
-// 	if m.started {
-// 		close(m.quit)
-// 		m.wg.Wait()
-// 	}
-// }
-func (m *Miner) reset() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.started = false
 }

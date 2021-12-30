@@ -247,9 +247,9 @@ func (b *Block) ReceiptsRoot() common.Hash {
 	return b.Header.ReceiptsRoot
 }
 
-func (b *Block) Bits() uint32 {
-	return b.Header.Bits
-}
+// func (b *Block) Bits() uint32 {
+// 	return b.Header.Bits
+// }
 
 func (b *Block) Nonce() uint32 {
 	return b.Header.Nonce

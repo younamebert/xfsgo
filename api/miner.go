@@ -94,8 +94,17 @@ func (handler *MinerAPIHandler) SetGasPrice(args MinerSetGasPriceArgs, resp *str
 // }
 
 // SetValidator sets the validator of the miner
-func (handler *MinerAPIHandler) SetValidator(args SetValidatorArgs, resp *bool) {
+func (handler *MinerAPIHandler) SetValidator(args SetValidatorArgs, resp *bool) error {
 
+	if err := common.AddrCalibrator(args.Address); err != nil {
+		return err
+	}
+
+	if ok := handler.Miner.SetValidator(common.StrB58ToAddress(args.Address)); ok {
+		*resp = true
+	}
+	*resp = false
+	return nil
 }
 
 func (handler *MinerAPIHandler) Status(_ EmptyArgs, resp *MinerStatusResp) error {
@@ -104,7 +113,7 @@ func (handler *MinerAPIHandler) Status(_ EmptyArgs, resp *MinerStatusResp) error
 	gasPrice := handler.Miner.GetGasPrice()
 	MinStartTime := handler.Miner.LastStartTime
 	MinCoinbase := handler.Miner.Coinbase
-	hashRate := handler.Miner.RunningHashRate()
+	// hashRate := handler.Miner.RunningHashRate()
 
 	MinWorkers := handler.Miner.GetWorkerNum()
 	MinStatus := handler.Miner.GetMinStatus()
@@ -112,14 +121,24 @@ func (handler *MinerAPIHandler) Status(_ EmptyArgs, resp *MinerStatusResp) error
 		Status:           MinStatus,
 		TargetHeight:     new(big.Int).SetUint64(mMiner.TargetHeight()).Text(10),
 		TargetDifficulty: fmt.Sprintf("%.4f", mMiner.NextDifficulty()),
-		TargetHashRate:   fmt.Sprintf("%.2f", mMiner.TargetHashRate()),
-		GasLimit:         gasLimit.Text(10),
-		GasPrice:         gasPrice.Text(10),
-		LastStartTime:    MinStartTime.Format(time.RFC3339),
-		Coinbase:         MinCoinbase.B58String(),
-		HashRate:         fmt.Sprintf("%.2f", float64(hashRate)),
-		Workers:          strconv.Itoa(int(MinWorkers)),
+		// TargetHashRate:   fmt.Sprintf("%.2f", mMiner.TargetHashRate()),
+		GasLimit:      gasLimit.Text(10),
+		GasPrice:      gasPrice.Text(10),
+		LastStartTime: MinStartTime.Format(time.RFC3339),
+		Coinbase:      MinCoinbase.B58String(),
+		HashRate:      mMiner.HashRate(),
+		Workers:       strconv.Itoa(int(MinWorkers)),
 	}
 	*resp = *result
+	return nil
+}
+
+func (handler *MinerAPIHandler) SetCoinbase(args MinerSetCoinbaseArgs, resp *bool) error {
+	if err := common.AddrCalibrator(args.Coinbase); err != nil {
+		return err
+	}
+	addr := common.StrB58ToAddress(args.Coinbase)
+	handler.Miner.SetCoinbase(addr)
+	*resp = true
 	return nil
 }

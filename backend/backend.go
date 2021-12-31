@@ -90,7 +90,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 	chainConfig := params.DposChainConfig
 
 	dposValis := make([]common.Address, 0)
-	dposValis = append(dposValis, common.B58ToAddress([]byte("YPJKvsirHXXtSvLtLiBHrXAoA69rgkcV2")))
+	dposValis = append(dposValis, common.B58ToAddress([]byte("m78VDDSW4nB4H1DTwNUipH1c7YNSgXt4s")))
 	chainConfig.Dpos = &params.DposConfig{
 		Validators: dposValis,
 	}

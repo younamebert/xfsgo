@@ -40,17 +40,17 @@ var (
 
 // Author implements consensus.Engine, returning the header's coinbase as the
 // proof-of-work verified author of the block.
-func (ethash *Ethash) Author(header *xfsgo.BlockHeader) (common.Address, error) {
-	return header.Coinbase, nil
+func (ethash *Ethash) Author(header *xfsgo.IBlockHeader) (common.Address, error) {
+	return header.Coinbase(), nil
 }
 
-func (ethash *Ethash) Coinbase(header *xfsgo.BlockHeader) (common.Address, error) {
-	return header.Coinbase, nil
+func (ethash *Ethash) Coinbase(header *xfsgo.IBlockHeader) (common.Address, error) {
+	return header.Coinbase(), nil
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules of the
 // stock Ethereum ethash engine.
-func (ethash *Ethash) VerifyHeader(chain *xfsgo.BlockChain, header *xfsgo.BlockHeader, seal bool) error {
+func (ethash *Ethash) VerifyHeader(chain *xfsgo.BlockChain, header *xfsgo.IBlockHeader, seal bool) error {
 	// If we're running a full engine faking, accept any input as valid
 	if ethash.fakeFull {
 		return nil
@@ -71,7 +71,7 @@ func (ethash *Ethash) VerifyHeader(chain *xfsgo.BlockChain, header *xfsgo.BlockH
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers
 // concurrently. The method returns a quit channel to abort the operations and
 // a results channel to retrieve the async verifications.
-func (ethash *Ethash) VerifyHeaders(chain *xfsgo.BlockChain, headers []*xfsgo.BlockHeader, seals []bool) (chan<- struct{}, <-chan error) {
+func (ethash *Ethash) VerifyHeaders(chain *xfsgo.BlockChain, headers []*xfsgo.IBlockHeader, seals []bool) (chan<- struct{}, <-chan error) {
 	// If we're running a full engine faking, accept any input as valid
 	if ethash.fakeFull || len(headers) == 0 {
 		abort, results := make(chan struct{}), make(chan error, len(headers))
@@ -133,8 +133,8 @@ func (ethash *Ethash) VerifyHeaders(chain *xfsgo.BlockChain, headers []*xfsgo.Bl
 	return abort, errorsOut
 }
 
-func (ethash *Ethash) verifyHeaderWorker(chain *xfsgo.BlockChain, headers []*xfsgo.BlockHeader, seals []bool, index int) error {
-	var parent *xfsgo.BlockHeader
+func (ethash *Ethash) verifyHeaderWorker(chain *xfsgo.BlockChain, headers []*xfsgo.IBlockHeader, seals []bool, index int) error {
+	var parent *xfsgo.IBlockHeader
 	if index == 0 {
 		parent = chain.GetBlockByHash(headers[0].HeaderHash()).Header
 	} else if headers[index-1].HashHex() == headers[index].HashHex() {
@@ -161,7 +161,7 @@ func (ethash *Ethash) verifyHeaderWorker(chain *xfsgo.BlockChain, headers []*xfs
 // 	// 	return errTooManyUncles
 // 	// }
 // 	// Gather the set of past uncles and ancestors
-// 	uncles, ancestors := set.New(), make(map[common.Hash]*xfsgo.BlockHeader)
+// 	uncles, ancestors := set.New(), make(map[common.Hash]*xfsgo.IBlockHeader)
 
 // 	number := block.NumberU64() - 1
 // 	for i := 0; i < 7; i++ {
@@ -204,7 +204,7 @@ func (ethash *Ethash) verifyHeaderWorker(chain *xfsgo.BlockChain, headers []*xfs
 // verifyHeader checks whether a header conforms to the consensus rules of the
 // stock Ethereum ethash engine.
 // See YP section 4.3.4. "Block Header Validity"
-func (ethash *Ethash) verifyHeader(chain *xfsgo.BlockChain, header, parent *xfsgo.BlockHeader, uncle bool, seal bool) error {
+func (ethash *Ethash) verifyHeader(chain *xfsgo.BlockChain, header, parent *xfsgo.IBlockHeader, uncle bool, seal bool) error {
 	// Ensure that the header's extra-data section is of a reasonable size
 	if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
 		return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
@@ -264,7 +264,7 @@ func (ethash *Ethash) verifyHeader(chain *xfsgo.BlockChain, header, parent *xfsg
 // the difficulty that a new block should have when created at time
 // given the parent block's time and difficulty.
 // TODO (karalabe): Move the chain maker into this package and make this private!
-func CalcDifficulty(config *params.ChainConfig, time uint64, parent *xfsgo.BlockHeader) *big.Int {
+func CalcDifficulty(config *params.ChainConfig, time uint64, parent *xfsgo.IBlockHeader) *big.Int {
 	next := new(big.Int).Add(parent.Number(), big1)
 	switch {
 	case config.IsByzantium(next):
@@ -290,7 +290,7 @@ var (
 // calcDifficultyByzantium is the difficulty adjustment algorithm. It returns
 // the difficulty that a new block should have when created at time given the
 // parent block's time and difficulty. The calculation uses the Byzantium rules.
-func calcDifficultyByzantium(time uint64, parent *xfsgo.BlockHeader) *big.Int {
+func calcDifficultyByzantium(time uint64, parent *xfsgo.IBlockHeader) *big.Int {
 	// https://github.com/ethereum/EIPs/issues/100.
 	// algorithm:
 	// diff = (parent_diff +
@@ -348,7 +348,7 @@ func calcDifficultyByzantium(time uint64, parent *xfsgo.BlockHeader) *big.Int {
 // calcDifficultyHomestead is the difficulty adjustment algorithm. It returns
 // the difficulty that a new block should have when created at time given the
 // parent block's time and difficulty. The calculation uses the Homestead rules.
-func calcDifficultyHomestead(time uint64, parent *xfsgo.BlockHeader) *big.Int {
+func calcDifficultyHomestead(time uint64, parent *xfsgo.IBlockHeader) *big.Int {
 	// https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2.mediawiki
 	// algorithm:
 	// diff = (parent_diff +
@@ -394,7 +394,7 @@ func calcDifficultyHomestead(time uint64, parent *xfsgo.BlockHeader) *big.Int {
 	return x
 }
 
-func calcDifficultyFrontier(time uint64, parent *xfsgo.BlockHeader) *big.Int {
+func calcDifficultyFrontier(time uint64, parent *xfsgo.IBlockHeader) *big.Int {
 	diff := new(big.Int)
 	adjust := new(big.Int).Div(parent.Difficulty, params.DifficultyBoundDivisor)
 	bigTime := new(big.Int)
@@ -426,7 +426,7 @@ func calcDifficultyFrontier(time uint64, parent *xfsgo.BlockHeader) *big.Int {
 
 // VerifySeal implements consensus.Engine, checking whether the given block satisfies
 // the PoW difficulty requirements.
-func (ethash *Ethash) VerifySeal(chain *xfsgo.BlockChain, header *xfsgo.BlockHeader) error {
+func (ethash *Ethash) VerifySeal(chain *xfsgo.BlockChain, header *xfsgo.IBlockHeader) error {
 	// If we're running a fake PoW, accept any seal as valid
 	if ethash.fakeMode {
 		time.Sleep(ethash.fakeDelay)
@@ -470,7 +470,7 @@ func (ethash *Ethash) VerifySeal(chain *xfsgo.BlockChain, header *xfsgo.BlockHea
 
 // Prepare implements consensus.Engine, initializing the difficulty field of a
 // header to conform to the ethash protocol. The changes are done inline.
-func (ethash *Ethash) Prepare(chain *xfsgo.BlockChain, header *xfsgo.BlockHeader) error {
+func (ethash *Ethash) Prepare(chain *xfsgo.BlockChain, header *xfsgo.IBlockHeader) error {
 	// parent := chain.GetHeader(header.ParentHash, header.Number().Uint64()-1)
 	parent := chain.GetBlockByNumber(header.Number().Uint64() - 1)
 	if parent == nil {
@@ -483,7 +483,7 @@ func (ethash *Ethash) Prepare(chain *xfsgo.BlockChain, header *xfsgo.BlockHeader
 
 // Finalize implements consensus.Engine, accumulating the block and uncle rewards,
 // setting the final state and assembling the block.
-func (ethash *Ethash) Finalize(chain *xfsgo.BlockChain, header *xfsgo.BlockHeader, state *xfsgo.StateTree, txs []*xfsgo.Transaction, receipts []*xfsgo.Receipt, ctx *avlmerkle.DposContext) (*xfsgo.Block, error) {
+func (ethash *Ethash) Finalize(chain *xfsgo.BlockChain, header *xfsgo.IBlockHeader, state *xfsgo.StateTree, txs []*xfsgo.Transaction, receipts []*xfsgo.Receipt, ctx *avlmerkle.DposContext) (*xfsgo.Block, error) {
 	// Accumulate any block and uncle rewards and commit the final state root
 	AccumulateRewards(chain.Config(), state, header)
 	// header. = state.IntermediateRoot(chain.Config().IsEIP158(header.Number()))
@@ -498,7 +498,7 @@ var (
 	big32 = big.NewInt(32)
 )
 
-func AccumulateRewards(config *params.ChainConfig, state *xfsgo.StateTree, header *xfsgo.BlockHeader) {
+func AccumulateRewards(config *params.ChainConfig, state *xfsgo.StateTree, header *xfsgo.IBlockHeader) {
 	// Select the correct block reward based on chain progression
 	blockReward := frontierBlockReward
 	if config.IsByzantium(header.Number()) {

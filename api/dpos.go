@@ -21,10 +21,10 @@ type GetBlockNumByValidatorArgs struct {
 
 // GetValidators retrieves the list of the validators at specified block
 func (handler *DposAPIHandler) GetValidators(args GetBlockNumByValidatorArgs, resp *[]common.Address) error {
-	var header *xfsgo.BlockHeader
+	var header xfsgo.IBlockHeader
 	var last uint64
 	if args.Number == "" {
-		last = handler.Chain.CurrentBHeader().Height
+		last = handler.Chain.CurrentBHeader(
 	} else {
 		number, ok := new(big.Int).SetString(args.Number, 0)
 		if !ok {

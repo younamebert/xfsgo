@@ -87,7 +87,7 @@ type Work struct {
 
 	Block *xfsgo.Block // the new block
 
-	header    *xfsgo.BlockHeader
+	header    xfsgo.IBlockHeader
 	txs       []*xfsgo.Transaction
 	receipts  []*xfsgo.Receipt
 	createdAt time.Time
@@ -507,7 +507,7 @@ func (m *Miner) createNewWork() (*Work, error) {
 }
 
 // makeCurrent creates a new environment for the current cycle.
-func (m *Miner) makeCurrent(parent *xfsgo.Block, header *xfsgo.BlockHeader) error {
+func (m *Miner) makeCurrent(parent *xfsgo.Block, header xfsgo.BlockHeader) error {
 	state := m.chain.StateAt(parent.Header.Root())
 	if state == nil {
 		return errors.New("state root nil")
@@ -673,7 +673,7 @@ func (m *Miner) applyTransactions(
 		rec, err := xfsgo.ApplyTransaction(m.chain, nil, mGasPool, stateTree, header, tx, &totalUsedGas, *m.chain.GetVMConfig(), m.current.dposContext)
 		// rec, err := m.chain.ApplyTransaction(stateTree, header, tx, mGasPool, totalUsedGas)
 		if err != nil {
-			if err.Error() == xfsgo.GasPoolOutErr.Error() {
+			if err.Error() == xfsgo.ErrGasPoolOutErr.Error() {
 				//logrus.Errorf("Miner apply transaction err will be ignore: %s", err)
 				ignoreTxs[txfrom] = struct{}{}
 				continue

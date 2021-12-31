@@ -85,7 +85,7 @@ type Dpos struct {
 	signer               common.Address
 	signFn               SignerFn
 	signatures           *lru.Cache // Signatures of recent blocks to speed up mining
-	confirmedBlockHeader *xfsgo.BlockHeader
+	confirmedBlockHeader xfsgo.IBlockHeader
 
 	mu   sync.RWMutex
 	stop chan bool
@@ -93,7 +93,7 @@ type Dpos struct {
 
 type SignerFn func(common.Address, []byte) ([]byte, error)
 
-func sigHash(header *xfsgo.BlockHeader) common.Hash {
+func sigHash(header xfsgo.IBlockHeader) common.Hash {
 	// hasher := sha3.NewKeccak256()
 	bs, _ := rawencode.Encode(header)
 	// hasher.Write(bs)
@@ -111,26 +111,26 @@ func New(config *params.DposConfig, db *badger.Storage) *Dpos {
 	}
 }
 
-func (d *Dpos) Author(header *xfsgo.BlockHeader) (common.Address, error) {
+func (d *Dpos) Author(header xfsgo.IBlockHeader) (common.Address, error) {
 	return header.Validator, nil
 }
 
-func (d *Dpos) Coinbase(header *xfsgo.BlockHeader) (common.Address, error) {
+func (d *Dpos) Coinbase(header xfsgo.IBlockHeader) (common.Address, error) {
 	return header.Coinbase, nil
 }
 
-func (d *Dpos) ConfirmedBlockHeader() *xfsgo.BlockHeader {
+func (d *Dpos) ConfirmedBlockHeader() xfsgo.IBlockHeader {
 	return d.confirmedBlockHeader
 }
 
 // func (d *Dpos) Db() *badger.Storage {
 // 	return d.db
 // }
-func (d *Dpos) VerifyHeader(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader, seal bool) error {
+func (d *Dpos) VerifyHeader(chain xfsgo.IBlockChain, header xfsgo.IBlockHeader, seal bool) error {
 	return d.verifyHeader(chain, header, nil)
 }
 
-func (d *Dpos) verifyHeader(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader, parents []*xfsgo.BlockHeader) error {
+func (d *Dpos) verifyHeader(chain xfsgo.IBlockChain, header xfsgo.IBlockHeader, parents []xfsgo.IBlockHeader) error {
 	if header.Number() == nil {
 		return errUnknownBlock
 	}
@@ -163,7 +163,7 @@ func (d *Dpos) verifyHeader(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader, 
 	// 	return err
 	// }
 
-	var parent *xfsgo.BlockHeader
+	var parent xfsgo.IBlockHeader
 	if len(parents) > 0 {
 		parent = parents[len(parents)-1]
 	} else {
@@ -179,7 +179,7 @@ func (d *Dpos) verifyHeader(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader, 
 	return nil
 }
 
-func (d *Dpos) VerifyHeaders(chain xfsgo.IBlockChain, headers []*xfsgo.BlockHeader, seals []bool) (chan<- struct{}, <-chan error) {
+func (d *Dpos) VerifyHeaders(chain xfsgo.IBlockChain, headers []xfsgo.IBlockHeader, seals []bool) (chan<- struct{}, <-chan error) {
 	abort := make(chan struct{})
 	results := make(chan error, len(headers))
 
@@ -207,17 +207,17 @@ func (d *Dpos) VerifyHeaders(chain xfsgo.IBlockChain, headers []*xfsgo.BlockHead
 
 // VerifySeal implements consensus.Engine, checking whether the signature contained
 // in the header satisfies the consensus protocol requirements.
-func (d *Dpos) VerifySeal(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader) error {
+func (d *Dpos) VerifySeal(chain xfsgo.IBlockChain, header xfsgo.IBlockHeader) error {
 	return d.verifySeal(chain, header, nil)
 }
 
-func (d *Dpos) verifySeal(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader, parents []*xfsgo.BlockHeader) error {
+func (d *Dpos) verifySeal(chain xfsgo.IBlockChain, header xfsgo.IBlockHeader, parents []xfsgo.IBlockHeader) error {
 	// Verifying the genesis block is not supported
 	number := header.Number().Uint64()
 	if number == 0 {
 		return errUnknownBlock
 	}
-	var parent *xfsgo.BlockHeader
+	var parent xfsgo.IBlockHeader
 	if len(parents) > 0 {
 		parent = parents[len(parents)-1]
 	} else {
@@ -238,7 +238,7 @@ func (d *Dpos) verifySeal(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader, pa
 	return d.updateConfirmedBlockHeader(chain)
 }
 
-func (d *Dpos) verifyBlockSigner(validator common.Address, header *xfsgo.BlockHeader) error {
+func (d *Dpos) verifyBlockSigner(validator common.Address, header xfsgo.IBlockHeader) error {
 	signer, err := ecrecover(header, d.signatures)
 	if err != nil {
 		return err
@@ -252,7 +252,7 @@ func (d *Dpos) verifyBlockSigner(validator common.Address, header *xfsgo.BlockHe
 	return nil
 }
 
-func (d *Dpos) LoadConfirmedBlockHeader(chain xfsgo.IBlockChain) (*xfsgo.BlockHeader, error) {
+func (d *Dpos) LoadConfirmedBlockHeader(chain xfsgo.IBlockChain) (xfsgo.IBlockHeader, error) {
 	return d.loadConfirmedBlockHeader(chain)
 }
 
@@ -303,7 +303,7 @@ func (d *Dpos) updateConfirmedBlockHeader(chain xfsgo.IBlockChain) error {
 	return nil
 }
 
-func (s *Dpos) loadConfirmedBlockHeader(chain xfsgo.IBlockChain) (*xfsgo.BlockHeader, error) {
+func (s *Dpos) loadConfirmedBlockHeader(chain xfsgo.IBlockChain) (xfsgo.IBlockHeader, error) {
 	key, err := s.db.GetData(confirmedBlockHead)
 	if err != nil {
 		return nil, err
@@ -321,7 +321,7 @@ func (s *Dpos) storeConfirmedBlockHeader(db badger.IStorage) error {
 	return db.SetData(confirmedBlockHead, scHash.Bytes())
 }
 
-func (d *Dpos) Prepare(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader) error {
+func (d *Dpos) Prepare(chain xfsgo.IBlockChain, header xfsgo.IBlockHeader) error {
 	header.Nonce = 0
 
 	if len(header.Extra) < extraVanity {
@@ -345,7 +345,7 @@ func (d *Dpos) Prepare(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader) error
 	return nil
 }
 
-func AccumulateRewards(config *params.ChainConfig, state *xfsgo.StateTree, header *xfsgo.BlockHeader) {
+func AccumulateRewards(config *params.ChainConfig, state *xfsgo.StateTree, header xfsgo.IBlockHeader) {
 	// Select the correct block reward based on chain progression
 	reward := new(big.Int).Set(frontierBlockReward)
 	if config.IsByzantium(header.Number()) {
@@ -356,7 +356,7 @@ func AccumulateRewards(config *params.ChainConfig, state *xfsgo.StateTree, heade
 	state.AddBalance(header.Coinbase, blockreward)
 }
 
-func (d *Dpos) Finalize(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader, state *xfsgo.StateTree, txs []*xfsgo.Transaction, receipts []*xfsgo.Receipt, dposContext *avlmerkle.DposContext) (*xfsgo.Block, error) {
+func (d *Dpos) Finalize(chain xfsgo.IBlockChain, header xfsgo.IBlockHeader, state *xfsgo.StateTree, txs []*xfsgo.Transaction, receipts []*xfsgo.Receipt, dposContext *avlmerkle.DposContext) (*xfsgo.Block, error) {
 	// Accumulate block rewards and commit the final state root
 	AccumulateRewards(chain.Config(), state, header)
 
@@ -417,7 +417,6 @@ func (d *Dpos) CheckValidator(lastBlock *xfsgo.Block, now int64) error {
 	logrus.Debugf("hex:%v hex2:%v\n", validator.B58String(), d.signer.B58String())
 
 	if (validator == common.Address{}) || bytes.Compare(validator.Bytes(), d.signer.Bytes()) != 0 {
-		fmt.Println(4)
 		return ErrInvalidBlockValidator
 	}
 	return nil
@@ -458,7 +457,7 @@ func (d *Dpos) Seal(chain xfsgo.IBlockChain, block *xfsgo.Block, stop <-chan str
 // func (d *Dpos) signFn() {
 // 	crypto.ECDSASign()
 // }
-func (d *Dpos) CalcDifficulty(chain xfsgo.IBlockChain, time uint64, parent *xfsgo.BlockHeader) *big.Int {
+func (d *Dpos) CalcDifficulty(chain xfsgo.IBlockChain, time uint64, parent xfsgo.IBlockHeader) *big.Int {
 	return big.NewInt(1)
 }
 
@@ -480,7 +479,7 @@ func (d *Dpos) Authorize(signer common.Address, signHash SignerFn) {
 }
 
 // ecrecover extracts the Ethereum account address from a signed header.
-func ecrecover(header *xfsgo.BlockHeader, sigcache *lru.Cache) (common.Address, error) {
+func ecrecover(header xfsgo.IBlockHeader, sigcache *lru.Cache) (common.Address, error) {
 	// If the signature's already cached, return that
 	hash := header.HeaderHash()
 	if address, known := sigcache.Get(hash); known {

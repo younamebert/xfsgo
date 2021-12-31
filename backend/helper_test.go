@@ -223,11 +223,11 @@ func (t *testChainMgr) NewBlock(txs []*xfsgo.Transaction, receipts []*xfsgo.Rece
 	blk := xfsgo.NewBlock(header, txs, receipts)
 	_ = t.writeBlock(blk)
 }
-func (t *testChainMgr) CurrentBHeader() *xfsgo.BlockHeader {
+func (t *testChainMgr) CurrentBHeader() xfsgo.IBlockHeader {
 	return t.last.Header
 }
 
-func (t *testChainMgr) GenesisBHeader() *xfsgo.BlockHeader {
+func (t *testChainMgr) GenesisBHeader() xfsgo.IBlockHeader {
 	return t.genesis.Header
 }
 

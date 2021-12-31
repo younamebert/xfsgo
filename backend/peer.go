@@ -19,7 +19,6 @@ package backend
 import (
 	"encoding/json"
 	"errors"
-	"github.com/sirupsen/logrus"
 	"math/big"
 	"sync"
 	"time"
@@ -27,6 +26,8 @@ import (
 	"xfsgo/common"
 	"xfsgo/p2p"
 	"xfsgo/p2p/discover"
+
+	"github.com/sirupsen/logrus"
 )
 
 type syncpeer interface {
@@ -269,7 +270,7 @@ func coverTxs2RemoteBlockTxHashs(txs []*xfsgo.Transaction) (re TxHashs) {
 	return
 }
 
-func coverBlockHeader2RemoteBlockHeader(header *xfsgo.BlockHeader) (re *RemoteBlockHeader) {
+func coverBlockHeader2RemoteBlockHeader(header xfsgo.IBlockHeader) (re *RemoteBlockHeader) {
 	if header == nil {
 		return nil
 	}

@@ -36,8 +36,8 @@ var (
 )
 
 type chainMgr interface {
-	CurrentBHeader() *xfsgo.BlockHeader
-	GenesisBHeader() *xfsgo.BlockHeader
+	CurrentBHeader() xfsgo.IBlockHeader
+	GenesisBHeader() xfsgo.IBlockHeader
 	GetBlockByNumber(num uint64) *xfsgo.Block
 	GetBlockHashesFromHash(hash common.Hash, max uint64) []common.Hash
 	GetBlockByHashWithoutRec(hash common.Hash) *xfsgo.Block
@@ -199,7 +199,7 @@ func (mgr *syncMgr) handlePeer(p syncpeer) error {
 	var err error = nil
 	head := mgr.chain.CurrentBHeader()
 	genesis := mgr.chain.GenesisBHeader()
-	if err = p.Handshake(head.HeaderHash(), head.Height, genesis.HeaderHash()); err != nil {
+	if err = p.Handshake(head.HeaderHash(), head.HeadHeight(), genesis.HeaderHash()); err != nil {
 		return err
 	}
 	mgr.peers.appendPeer(p)
@@ -269,7 +269,7 @@ func (mgr *syncMgr) findAncestor(p syncpeer) (uint64, error) {
 	if headBlock == nil {
 		return 0, errors.New("empty")
 	}
-	height := headBlock.Height
+	height := headBlock.HeadHeight()
 
 	var from = 0
 	from = int(height) - int(maxHashesFetch)
@@ -581,7 +581,7 @@ func (mgr *syncMgr) report(v uint64, t time.Time) {
 		return
 	}
 	head := mgr.chain.CurrentBHeader()
-	nowHeight := head.Height
+	nowHeight := head.HeadHeight()
 	if nowHeight-(v-1) > 0 && nowHeight < mgr.lastRecord {
 		total := mgr.lastRecord - v
 		completed := nowHeight - (v - 1)
@@ -659,7 +659,7 @@ func (mgr *syncMgr) Synchronise(p syncpeer) {
 		return
 	}
 	chainHead := mgr.chain.CurrentBHeader()
-	currentHeight := chainHead.Height
+	currentHeight := chainHead.HeadHeight()
 	//logrus.Infof("chainHead: %d, pheight: %d", currentHeight, p.Height())
 	if p.Height() <= currentHeight {
 		return
@@ -753,7 +753,7 @@ func (mgr *syncMgr) txBroadcastLoop() {
 }
 func (mgr *syncMgr) BroadcastTx(tx *RemoteBlockTx) {
 	mHeader := mgr.chain.CurrentBHeader()
-	mHeight := mHeader.Height
+	mHeight := mHeader.HeadHeight()
 	if !mgr.nodeSyncFlag {
 		return
 	}

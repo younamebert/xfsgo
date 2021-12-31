@@ -220,7 +220,7 @@ func sortAndEncodeMap(data map[string]string) string {
 }
 
 func (t *Transaction) SignHash() common.Hash {
-	//nt := t.copyTrim()
+	//nt := t.CopyTrim()
 	data := ""
 	if t.Data != nil && len(t.Data) > 0 {
 		data = "0x" + hex.EncodeToString(t.Data)

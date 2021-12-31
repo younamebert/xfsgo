@@ -33,6 +33,34 @@ var (
 
 const version0 = uint32(0)
 
+type IBlockHeader interface {
+	Number() *big.Int // get blockHeader height type big.Int
+	HeadHeight() uint64
+	HeaderNonce() *big.Int // get blockHeader nonce type big.Int
+	Root() common.Hash     // get blockHeader state root type common.Hash
+	Time() *big.Int        // get Timestamp to big.int type
+	HeaderHash() common.Hash
+	TxHash() common.Hash
+	HashHex() string
+	Encode() ([]byte, error)
+	Decode(data []byte) error
+	CopyTrim() *BlockHeader
+	String() string
+	HashNoNonce() common.Hash
+	ReceiptsHash() common.Hash
+	GetGasUsed() *big.Int
+	GetGasLimit() *big.Int
+	GetTxsRoot() common.Hash
+	GetReceiptsRoot() common.Hash
+	GetStateRoot() common.Hash
+	HeadDposContext() *avlmerkle.DposContextProto
+	GetValidator() common.Address
+	GetCoinbase() common.Address
+	GetHashPrevBlock() common.Hash
+	GetHead() *BlockHeader
+	GetBits() uint32
+}
+
 // BlockHeader represents a block header in the xfs blockchain.
 // It is importance to note that the BlockHeader includes StateRoot,TransactionsRoot
 // and ReceiptsRoot fields which implement the state management of the xfs blockchain.
@@ -64,10 +92,36 @@ func (bHead *BlockHeader) Number() *big.Int {
 	return new(big.Int).SetUint64(bHead.Height)
 }
 
+func (bHead *BlockHeader) GetValidator() common.Address {
+	return bHead.Validator
+}
+
+func (bHead *BlockHeader) GetCoinbase() common.Address {
+	return bHead.Coinbase
+}
+
+func (bHead *BlockHeader) GetHashPrevBlock() common.Hash {
+	return bHead.HashPrevBlock
+}
+
+func (bHead *BlockHeader) GetHead() *BlockHeader {
+	return bHead
+}
+
+func (bHead *BlockHeader) GetBits() uint32 {
+	return bHead.Bits
+}
+
+func (bHead *BlockHeader) HeadHeight() uint64 {
+	return bHead.Height
+}
 func (bHead *BlockHeader) HeaderNonce() *big.Int {
 	return big.NewInt(int64(bHead.Nonce))
 }
 
+func (bHead *BlockHeader) HeadDposContext() *avlmerkle.DposContextProto {
+	return bHead.DposContext
+}
 func (bHead *BlockHeader) Root() common.Hash {
 	return bHead.StateRoot
 }
@@ -81,6 +135,26 @@ func (bHead *BlockHeader) HeaderHash() common.Hash {
 	data, _ := rawencode.Encode(bHead)
 	hash := ahash.SHA256(data)
 	return common.Bytes2Hash(hash)
+}
+
+func (bHead *BlockHeader) GetGasUsed() *big.Int {
+	return bHead.GasUsed
+}
+
+func (bHead *BlockHeader) GetGasLimit() *big.Int {
+	return bHead.GasLimit
+}
+
+func (bHead *BlockHeader) GetTxsRoot() common.Hash {
+	return bHead.TransactionsRoot
+}
+
+func (bHead *BlockHeader) GetReceiptsRoot() common.Hash {
+	return bHead.ReceiptsRoot
+}
+
+func (bHead *BlockHeader) GetStateRoot() common.Hash {
+	return bHead.StateRoot
 }
 
 func (bHead *BlockHeader) TxHash() common.Hash {
@@ -104,7 +178,7 @@ func (bHead *BlockHeader) clone() *BlockHeader {
 	p := *bHead
 	return &p
 }
-func (bHead *BlockHeader) copyTrim() *BlockHeader {
+func (bHead *BlockHeader) CopyTrim() *BlockHeader {
 	h := bHead.clone()
 	h.Nonce = 0
 	h.ExtraNonce = 0
@@ -119,7 +193,7 @@ func (bHead *BlockHeader) String() string {
 }
 
 func (bHead *BlockHeader) HashNoNonce() common.Hash {
-	header := bHead.copyTrim()
+	header := bHead.CopyTrim()
 	data, _ := rawencode.Encode(header)
 	hash := ahash.SHA256(data)
 	return common.Bytes2Hash(hash)
@@ -127,6 +201,32 @@ func (bHead *BlockHeader) HashNoNonce() common.Hash {
 
 func (bHead *BlockHeader) ReceiptsHash() common.Hash {
 	return bHead.ReceiptsRoot
+}
+
+type IBlock interface {
+	GetHeader() IBlockHeader
+	GasUsed() *big.Int
+	Encode() ([]byte, error)
+	Decode(data []byte) error
+	HashPrevBlock() common.Hash
+	HashNoNonce() common.Hash
+	HeaderHash() common.Hash
+	HashHex() string
+	Height() uint64
+	DposCtx() *avlmerkle.DposContext
+	StateRoot() common.Hash
+	Coinbase() common.Address
+	TransactionRoot() common.Hash
+	ReceiptsRoot() common.Hash
+	Bits() uint32
+	Nonce() uint32
+	ExtraNonce() uint64
+	UpdateExtraNonce(ExtraNonce uint64)
+	UpdateNonce(nonce uint32)
+	Timestamp() uint64
+	Time() *big.Int
+	WithSeal(header *BlockHeader) IBlock
+	String() string
 }
 
 type Block struct {
@@ -145,7 +245,7 @@ func NewBlock(header *BlockHeader, txs []*Transaction, receipts []*Receipt) *Blo
 	b := &Block{
 		Header: header,
 	}
-	b.Header.GasLimit = header.GasLimit
+	b.Header.GasLimit = header.GetGasLimit()
 	if len(txs) == 0 {
 		b.Header.TransactionsRoot = emptyHash
 	} else {
@@ -163,7 +263,7 @@ func NewBlock(header *BlockHeader, txs []*Transaction, receipts []*Receipt) *Blo
 	return b
 }
 
-func (b *Block) GetHeader() *BlockHeader {
+func (b *Block) GetHeader() IBlockHeader {
 	return b.Header
 }
 
@@ -209,7 +309,7 @@ func (b *Block) HashPrevBlock() common.Hash {
 }
 
 func (b *Block) HashNoNonce() common.Hash {
-	header := b.Header.copyTrim()
+	header := b.Header.CopyTrim()
 	data, _ := rawencode.Encode(header)
 	hash := ahash.SHA256(data)
 	return common.Bytes2Hash(hash)
@@ -232,7 +332,7 @@ func (b *Block) Height() uint64 {
 func (b *Block) DposCtx() *avlmerkle.DposContext { return b.DposContext }
 
 func (b *Block) StateRoot() common.Hash {
-	return b.Header.StateRoot
+	return b.Header.GetStateRoot()
 }
 
 func (b *Block) Coinbase() common.Address {
@@ -247,9 +347,9 @@ func (b *Block) ReceiptsRoot() common.Hash {
 	return b.Header.ReceiptsRoot
 }
 
-// func (b *Block) Bits() uint32 {
-// 	return b.Header.Bits
-// }
+func (b *Block) Bits() uint32 {
+	return b.Header.Bits
+}
 
 func (b *Block) Nonce() uint32 {
 	return b.Header.Nonce
@@ -276,7 +376,7 @@ func (b *Block) Time() *big.Int {
 
 // WithSeal returns a new block with the data from b but the header replaced with
 // the sealed one.
-func (b *Block) WithSeal(header *BlockHeader) *Block {
+func (b *Block) WithSeal(header *BlockHeader) IBlock {
 	cpy := *header
 
 	return &Block{

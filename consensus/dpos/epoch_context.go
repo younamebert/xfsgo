@@ -150,7 +150,7 @@ func (ec *EpochContext) lookupValidator(now int64) (validator common.Address, er
 	return validators[offset], nil
 }
 
-func (ec *EpochContext) tryElect(genesis, parent *xfsgo.BlockHeader) error {
+func (ec *EpochContext) tryElect(genesis, parent xfsgo.IBlockHeader) error {
 	genesisEpoch := genesis.Time().Int64() / epochInterval
 	prevEpoch := parent.Time().Int64() / epochInterval
 	currentEpoch := ec.TimeStamp / epochInterval
@@ -203,7 +203,7 @@ func (ec *EpochContext) tryElect(genesis, parent *xfsgo.BlockHeader) error {
 		epochTrie, _ := avlmerkle.NewEpochTrie(common.Hash{}, ec.DposContext.DB())
 		ec.DposContext.SetEpoch(epochTrie)
 		ec.DposContext.SetValidators(sortedValidators)
-		logrus.Infof("Come to new epoch prevEpoch %s nextEpoch %s", i, i+1)
+		logrus.Infof("Come to new epoch prevEpoch %v nextEpoch %v", i, i+1)
 	}
 	return nil
 }

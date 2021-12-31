@@ -26,11 +26,11 @@ import (
 // current blockchain to be used during transaction processing.
 type ChainContext interface {
 	// GetHeader returns the hash corresponding to their hash.
-	GetHeader(common.Hash, uint64) *BlockHeader
+	GetHeader(common.Hash, uint64) IBlockHeader
 }
 
 // NewEVMBlockContext creates a new context for use in the EVM.
-func NewEVMBlockContext(header *BlockHeader, chain ChainContext, author *common.Address) vm.BlockContext {
+func NewEVMBlockContext(header IBlockHeader, chain ChainContext, author *common.Address) vm.BlockContext {
 	var (
 		beneficiary common.Address
 		baseFee     *big.Int
@@ -41,11 +41,11 @@ func NewEVMBlockContext(header *BlockHeader, chain ChainContext, author *common.
 		Transfer:    Transfer,
 		GetHash:     GetHashFn(header, chain),
 		Coinbase:    beneficiary,
-		BlockNumber: new(big.Int).SetUint64(header.Height),
-		Time:        new(big.Int).SetUint64(header.Timestamp),
-		Difficulty:  new(big.Int).SetUint64(uint64(header.Bits)),
+		BlockNumber: header.Number(),
+		Time:        header.Time(),
+		Difficulty:  new(big.Int).SetUint64(uint64(header.GetBits())),
 		BaseFee:     baseFee,
-		GasLimit:    header.GasLimit.Uint64(),
+		GasLimit:    header.GetGasLimit().Uint64(),
 	}
 }
 
@@ -58,7 +58,7 @@ func NewEVMTxContext(msg Message) vm.TxContext {
 }
 
 // GetHashFn returns a GetHashFunc which retrieves header hashes by number
-func GetHashFn(ref *BlockHeader, chain ChainContext) func(n uint64) common.Hash {
+func GetHashFn(ref IBlockHeader, chain ChainContext) func(n uint64) common.Hash {
 	// Cache will initially contain [refHash.parent],
 	// Then fill up with [refHash.p, refHash.pp, refHash.ppp, ...]
 	var cache []common.Hash
@@ -66,23 +66,23 @@ func GetHashFn(ref *BlockHeader, chain ChainContext) func(n uint64) common.Hash 
 	return func(n uint64) common.Hash {
 		// If there's no hash cache yet, make one
 		if len(cache) == 0 {
-			cache = append(cache, common.Hash(ref.HashPrevBlock))
+			cache = append(cache, common.Hash(ref.GetHashPrevBlock()))
 		}
-		if idx := ref.Height - n - 1; idx < uint64(len(cache)) {
+		if idx := ref.HeadHeight() - n - 1; idx < uint64(len(cache)) {
 			return cache[idx]
 		}
 		// No luck in the cache, but we can start iterating from the last element we already know
 		lastKnownHash := cache[len(cache)-1]
-		lastKnownNumber := ref.Height - uint64(len(cache))
+		lastKnownNumber := ref.HeadHeight() - uint64(len(cache))
 
 		for {
 			header := chain.GetHeader(lastKnownHash, lastKnownNumber)
 			if header == nil {
 				break
 			}
-			cache = append(cache, common.Hash(header.HashPrevBlock))
-			lastKnownHash = common.Hash(header.HashPrevBlock)
-			lastKnownNumber = header.Height - 1
+			cache = append(cache, common.Hash(header.GetHashPrevBlock()))
+			lastKnownHash = common.Hash(header.GetHashPrevBlock())
+			lastKnownNumber = header.HeadHeight() - 1
 			if n == lastKnownNumber {
 				return lastKnownHash
 			}

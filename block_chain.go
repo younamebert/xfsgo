@@ -588,6 +588,7 @@ func calcBlockSubsidy(height uint64) *big.Int {
 // AccumulateRewards calculates the rewards and add it to the miner's account.
 func AccumulateRewards(stateTree *StateTree, header *BlockHeader) {
 	subsidy := calcBlockSubsidy(header.Height)
+
 	//logrus.Debugf("Current height of the blockchain %d, reward: %d", header.Height, subsidy)
 	stateTree.AddBalance(header.Coinbase, subsidy)
 }

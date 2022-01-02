@@ -117,15 +117,19 @@ func TestXvm_Create(t *testing.T) {
 	if err := vm.Create(addr, inputBuf.Bytes()); err != nil {
 		t.Fatal(err)
 	}
-	vm2 := NewXVM(st)
-	_ = vm2
-	nonce := vm2.stateTree.GetNonce(addr)
+	nonce := vm.stateTree.GetNonce(addr)
 	caddr := crypto.CreateAddress(addr.Hash(), nonce)
-	if err := vm2.Call(caddr, tokenGetNameFnHash); err != nil {
+	bc, err := vm.GetBuiltinContract(caddr)
+	if err != nil {
 		t.Fatal(err)
 	}
-	//json.Unmarshal()
-	t.Log("abc")
+	tc := bc.(*token)
+	tname := tc.GetName()
+	tsy := tc.GetSymbol()
+	decs := tc.GetDecimals()
+	t.Logf("tokenName: %s", tname.string())
+	t.Logf("tokenSymbol: %s", tsy.string())
+	t.Logf("tokenDecimals: %d", decs.uint8())
 }
 
 func TestXvm_Run(t *testing.T) {

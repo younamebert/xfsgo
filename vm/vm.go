@@ -3,6 +3,7 @@ package vm
 import (
 	"encoding/binary"
 	"errors"
+	"reflect"
 	"xfsgo/common"
 	"xfsgo/core"
 	"xfsgo/crypto"
@@ -20,52 +21,54 @@ const (
 
 var (
 	errUnknownMagicNumber  = errors.New("unknown magic number")
-	errUnknownContractType = errors.New("unknown contract type")
+	errUnknownContractId   = errors.New("unknown contract type")
+	errUnknownContractExec = errors.New("unknown contract exec")
+	errInvalidContractCode = errors.New("invalid contract code")
 )
 
 type xvm struct {
 	stateTree core.StateTree
-	builtin   map[uint8]BuiltinContract
+	builtins  map[uint8]reflect.Type
 	returnBuf Buffer
 }
 
 func NewXVM(st core.StateTree) *xvm {
 	vm := &xvm{
 		stateTree: st,
-		builtin:   make(map[uint8]BuiltinContract),
+		builtins:  make(map[uint8]reflect.Type),
 		returnBuf: NewBuffer(nil),
 	}
-	vm.registerBuiltinId(new(token))
+	tk := new(token)
+	tk.BuiltinContract = StdBuiltinContract()
+	vm.registerBuiltinId(tk)
 	return vm
 }
-
-func (vm *xvm) newXVMPayload(contract BuiltinContract, address common.Address, code []byte) (*xvmPayload, error) {
-	return &xvmPayload{
-		code:      code,
-		address:   address,
-		stateTree: vm.stateTree,
-		contract:  contract,
-		resultBuf: vm.returnBuf,
-	}, nil
-}
-func (vm *xvm) createPayload(address common.Address, id uint8, code []byte) (payload, error) {
-	if pk, exists := vm.builtin[id]; exists {
-		return vm.newXVMPayload(pk, address, code)
+func (vm *xvm) newBuiltinContractExec(id uint8, address common.Address, code []byte) (*builtinContractExec, error) {
+	if ct, exists := vm.builtins[id]; exists {
+		return &builtinContractExec{
+			contractT: ct,
+			stateTree: vm.stateTree,
+			address:   address,
+			code:      code,
+			resultBuf: NewBuffer(nil),
+		}, nil
 	}
-	return nil, errUnknownContractType
+	return nil, errUnknownContractId
 }
 func (vm *xvm) registerBuiltinId(b BuiltinContract) {
-	if _, exists := vm.builtin[b.BuiltinId()]; !exists {
-		vm.builtin[b.BuiltinId()] = b
+	bid := b.BuiltinId()
+	if _, exists := vm.builtins[bid]; !exists {
+		rt := reflect.TypeOf(b)
+		vm.builtins[bid] = rt
 	}
 }
-func (vm *xvm) readCode(code []byte, input []byte) (c []byte, id uint8, err error) {
+func readXVMCode(code []byte, input []byte) (c []byte, id uint8, err error) {
 	if code == nil && input != nil {
 		code = make([]byte, 3)
 		copy(code[:], input[:])
 	}
 	if code == nil || len(code) < 3 {
-		return code, 0, errors.New("eof")
+		return code, 0, errInvalidContractCode
 	}
 	m := binary.LittleEndian.Uint16(code[:2])
 	if m != magicNumberXVM {
@@ -75,27 +78,34 @@ func (vm *xvm) readCode(code []byte, input []byte) (c []byte, id uint8, err erro
 	id = code[2]
 	return
 }
-func (vm *xvm) Run(addr common.Address, code []byte, input []byte) error {
+func (vm *xvm) Run(addr common.Address, code []byte, input []byte) (err error) {
 	var create = code == nil
-	code, id, err := vm.readCode(code, input)
-	if err != nil {
-		return err
+	code, id, err := readXVMCode(code, input)
+	if err != nil && create {
+		vm.stateTree.SetCode(addr, code)
+		return nil
+	} else if err != nil {
+		return nil
 	}
-	pl, err := vm.createPayload(addr, id, code)
-	if err != nil {
-		return err
+	var exec ContractExec
+	if id != 0 {
+		if exec, err = vm.newBuiltinContractExec(id, addr, code); err != nil {
+			return
+		}
+	}
+	if exec == nil {
+		return errUnknownContractExec
 	}
 	if create {
 		var realInput = make([]byte, len(input)-3)
 		copy(realInput[:], input[3:])
-
-		if err = pl.Create(realInput); err != nil {
+		if err = exec.Create(realInput); err != nil {
 			return err
 		}
 		vm.stateTree.SetCode(addr, code)
 		return nil
 	}
-	if err = pl.Call(input); err != nil {
+	if err = exec.Call(input); err != nil {
 		return err
 	}
 	return nil
@@ -115,4 +125,17 @@ func (vm *xvm) Call(address common.Address, input []byte) error {
 		return err
 	}
 	return nil
+}
+func (vm *xvm) GetBuiltinContract(address common.Address) (c interface{}, err error) {
+	code := vm.stateTree.GetCode(address)
+	code, id, err := readXVMCode(code, nil)
+	if err != nil {
+		return
+	}
+	var exec *builtinContractExec
+	if exec, err = vm.newBuiltinContractExec(id, address, code); err != nil {
+		return
+	}
+	c, _, err = exec.MakeBuiltinContract()
+	return
 }

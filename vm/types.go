@@ -101,7 +101,7 @@ func (t *CTypeUint256) UnmarshalText(text []byte) (err error) {
 }
 
 func (t CTypeString) string() string {
-	return string(t)
+	return string(t[:])
 }
 
 func (t CTypeString) MarshalText() (d []byte, err error) {
@@ -113,7 +113,7 @@ func (t CTypeString) MarshalText() (d []byte, err error) {
 func (t *CTypeString) UnmarshalText(text []byte) (err error) {
 	var bs []byte
 	bs, err = hex.DecodeString(string(text))
-	*t = make([]byte, len(text))
+	*t = make([]byte, len(bs))
 	copy(*t, bs)
 	return
 }

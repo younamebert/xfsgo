@@ -8,17 +8,46 @@ import (
 type ContractPayload interface {
 	Create()
 }
+
+type ContractHelper interface {
+	SetStateTree(st core.StateTree)
+	GetStateTree() (st core.StateTree)
+	GetAddress() (addr common.Address)
+	SetAddress(addr common.Address)
+}
 type BuiltinContract interface {
-	GetStateTree() core.StateTree
-	GetAddress() common.Address
-	Storage([32]byte, []byte)
-	StorageFiled(string, []byte)
-	BuiltinId() uint8
+	ContractHelper
+	BuiltinId() (id uint8)
 }
 
-type builtinContract struct {
+type absBuiltinContract struct {
+	st   core.StateTree
+	addr common.Address
 }
 
-func StdBuiltinContract() *builtinContract {
-	return &builtinContract{}
+func StdBuiltinContract() *absBuiltinContract {
+	return &absBuiltinContract{}
+}
+
+func (abs *absBuiltinContract) SetAddress(addr common.Address) {
+	abs.addr = addr
+}
+
+func (abs *absBuiltinContract) GetAddress() (addr common.Address) {
+	addr = abs.addr
+	return
+}
+
+func (abs *absBuiltinContract) SetStateTree(st core.StateTree) {
+	abs.st = st
+	return
+}
+
+func (abs *absBuiltinContract) GetStateTree() (st core.StateTree) {
+	st = abs.st
+	return
+}
+
+func (abs *absBuiltinContract) BuiltinId() (id uint8) {
+	return
 }

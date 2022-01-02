@@ -82,7 +82,8 @@ func (vm *xvm) Run(addr common.Address, code []byte, input []byte) (err error) {
 	var create = code == nil
 	code, id, err := readXVMCode(code, input)
 	if err != nil && create {
-		vm.stateTree.SetCode(addr, code)
+		vm.stateTree.AddNonce(addr, 1)
+		vm.stateTree.SetCode(addr, input)
 		return nil
 	} else if err != nil {
 		return nil
@@ -102,6 +103,7 @@ func (vm *xvm) Run(addr common.Address, code []byte, input []byte) (err error) {
 		if err = exec.Create(realInput); err != nil {
 			return err
 		}
+		vm.stateTree.AddNonce(addr, 1)
 		vm.stateTree.SetCode(addr, code)
 		return nil
 	}

@@ -49,11 +49,15 @@ func (t *testStateTree) GetStateValue(addr common.Address, key [32]byte) []byte 
 func (t *testStateTree) SetCode(addr common.Address, code []byte) {
 	t.codes[ahash.SHA256Array(addr[:])] = code
 }
-
+func (t *testStateTree) AddNonce(addr common.Address, val uint64) {
+	oldnonce, _ := t.nonce[ahash.SHA256Array(addr[:])]
+	t.nonce[ahash.SHA256Array(addr[:])] = oldnonce + val
+}
 func newTestStateTree() *testStateTree {
 	return &testStateTree{
 		data:  make(map[[32]byte][]byte),
 		codes: make(map[[32]byte][]byte),
+		nonce: make(map[[32]byte]uint64),
 	}
 }
 
@@ -112,12 +116,20 @@ func TestXvm_Create(t *testing.T) {
 	inputBuf.Write(tokenCreateFnHash)
 	inputBuf.Write(testAbTokenCreateParams)
 	addr := common.Address{0x01}
+	simpleCode := []byte("hello, world")
+	if err := vm.Create(addr, simpleCode); err != nil {
+		t.Fatal(err)
+	}
+	nonce1 := vm.stateTree.GetNonce(addr)
+	c1addr := crypto.CreateAddress(addr.Hash(), nonce1)
+	c1code := vm.stateTree.GetCode(c1addr)
+	assert.Equal(t, c1code, simpleCode)
 	if err := vm.Create(addr, inputBuf.Bytes()); err != nil {
 		t.Fatal(err)
 	}
-	nonce := vm.stateTree.GetNonce(addr)
-	caddr := crypto.CreateAddress(addr.Hash(), nonce)
-	bc, err := vm.GetBuiltinContract(caddr)
+	nonce2 := vm.stateTree.GetNonce(addr)
+	c2addr := crypto.CreateAddress(addr.Hash(), nonce2)
+	bc, err := vm.GetBuiltinContract(c2addr)
 	if err != nil {
 		t.Fatal(err)
 	}

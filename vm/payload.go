@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 	"xfsgo/common"
 	"xfsgo/common/ahash"
 	"xfsgo/core"
@@ -54,8 +55,8 @@ func (p *xvmPayload) call(fn reflect.Method, fnv reflect.Value, input []byte) er
 	var args = make([]reflect.Value, 0)
 	for i := 1; i < n; i++ {
 		parameterType := mType.In(i)
-		switch parameterType.Name() {
-		case "CTypeString":
+		switch parameterType {
+		case reflect.TypeOf(CTypeString{}):
 			ssize, err := buf.ReadUint32()
 			if err != nil {
 				return err
@@ -65,13 +66,13 @@ func (p *xvmPayload) call(fn reflect.Method, fnv reflect.Value, input []byte) er
 				return err
 			}
 			args = append(args, reflect.ValueOf(s))
-		case "CTypeUint8":
+		case reflect.TypeOf(CTypeUint8{}):
 			m, err := buf.ReadUint8()
 			if err != nil {
 				return err
 			}
 			args = append(args, reflect.ValueOf(m))
-		case "CTypeUint256":
+		case reflect.TypeOf(CTypeUint256{}):
 			m, err := buf.ReadUint256()
 			if err != nil {
 				return err
@@ -111,36 +112,24 @@ func findContractStorageValue(cte reflect.Type, cve reflect.Value) []*stv {
 	return stvs
 }
 func (p *xvmPayload) setupContract(stvs []*stv) (err error) {
+	var buf strings.Builder
+	buf.WriteString("{")
 	for i := 0; i < len(stvs); i++ {
 		st := stvs[i]
 		data := p.stateTree.GetStateValue(p.address, st.nameHash)
 		if data == nil {
 			continue
 		}
-		switch st.Type {
-		case reflect.TypeOf(CTypeString{}):
-			cs := CTypeString{}
-			if err = json.Unmarshal(data, &cs); err != nil {
-				return
-			}
-			st.val.Set(reflect.ValueOf(cs))
-		case reflect.TypeOf(CTypeUint8(0)):
-			cs := CTypeUint8(0)
-			if err = json.Unmarshal(data, &cs); err != nil {
-				return
-			}
-			st.val.Set(reflect.ValueOf(cs))
-		case reflect.TypeOf(CTypeUint256{}):
-			cs := CTypeUint256{}
-			if err = json.Unmarshal(data, &cs); err != nil {
-				return
-			}
-			st.val.Set(reflect.ValueOf(cs))
+		prefix := fmt.Sprintf("\"%s\":", st.Name)
+		buf.WriteString(prefix)
+		buf.Write(data)
+		if i < len(stvs)-1 {
+			buf.WriteString(",")
 		}
-		fmt.Printf("name: %s, hash: %x, type: %v, val: %s\n", st.Name, st.nameHash[:], st.Type, "nil")
 	}
-	fmt.Println()
-	//fmt.Printf("name: %s, hash: %x, type: %v, val: %s\n", st.Name, st.nameHash[:], st.Type, "nil")
+	buf.WriteString("}")
+	bs := buf.String()
+	err = json.Unmarshal([]byte(bs), &p.contract)
 	return
 }
 

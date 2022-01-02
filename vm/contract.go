@@ -15,3 +15,10 @@ type BuiltinContract interface {
 	StorageFiled(string, []byte)
 	BuiltinId() uint8
 }
+
+type builtinContract struct {
+}
+
+func StdBuiltinContract() *builtinContract {
+	return &builtinContract{}
+}

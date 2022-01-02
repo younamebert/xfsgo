@@ -7,8 +7,8 @@ import (
 	"xfsgo/common"
 )
 
-type CTypeUint8 byte
-type CTypeBool byte
+type CTypeUint8 [1]byte
+type CTypeBool [1]byte
 type CTypeUint16 [2]byte
 type CTypeUint32 [4]byte
 type CTypeUint64 [8]byte
@@ -17,18 +17,19 @@ type CTypeString []byte
 type CTypeAddress [25]byte
 
 func (t CTypeUint8) uint8() uint8 {
-	return uint8(t)
+	return t[0]
 }
 
-func (t CTypeUint8) Encode() (d []byte, err error) {
-	d = make([]byte, 1)
-	copy(d[:], []byte{byte(t)})
+func (t CTypeUint8) MarshalText() (d []byte, err error) {
+	ds := hex.EncodeToString(t[:])
+	d = make([]byte, len(ds))
+	copy(d[:], ds[:])
 	return
 }
-
-func (t *CTypeUint8) Decode(data []byte) (err error) {
-	tp := CTypeUint8(data[0])
-	*t = *&tp
+func (t *CTypeUint8) UnmarshalText(text []byte) (err error) {
+	var bs []byte
+	bs, err = hex.DecodeString(string(text))
+	copy(t[:], bs)
 	return
 }
 
@@ -41,31 +42,46 @@ func (t CTypeUint16) Encode() (d []byte, err error) {
 	copy(d[:], t[:])
 	return
 }
-
-func (t CTypeUint16) Decode(data []byte) (err error) {
-	copy(t[:], data[:])
+func (t CTypeUint16) MarshalText() (d []byte, err error) {
+	ds := hex.EncodeToString(t[:])
+	d = make([]byte, len(ds))
+	copy(d[:], ds[:])
 	return
 }
-
+func (t *CTypeUint16) UnmarshalText(text []byte) (err error) {
+	var bs []byte
+	bs, err = hex.DecodeString(string(text))
+	copy(t[:], bs)
+	return
+}
 func (t CTypeUint32) uint32() uint32 {
 	return binary.LittleEndian.Uint32(t[:])
 }
-func (t CTypeUint32) Encode() (d []byte, err error) {
-	d = make([]byte, len(t))
-	copy(d[:], t[:])
+func (t CTypeUint32) MarshalText() (d []byte, err error) {
+	ds := hex.EncodeToString(t[:])
+	d = make([]byte, len(ds))
+	copy(d[:], ds[:])
 	return
 }
-func (t CTypeUint32) Decode(data []byte) (err error) {
-	copy(t[:], data[:])
+func (t *CTypeUint32) UnmarshalText(text []byte) (err error) {
+	var bs []byte
+	bs, err = hex.DecodeString(string(text))
+	copy(t[:], bs)
 	return
 }
-
 func (t CTypeUint64) uint64() uint64 {
 	return binary.LittleEndian.Uint64(t[:])
 }
-func (t CTypeUint64) Encode() (d []byte, err error) {
-	d = make([]byte, len(t))
-	copy(d[:], t[:])
+func (t CTypeUint64) MarshalText() (d []byte, err error) {
+	ds := hex.EncodeToString(t[:])
+	d = make([]byte, len(ds))
+	copy(d[:], ds[:])
+	return
+}
+func (t *CTypeUint64) UnmarshalText(text []byte) (err error) {
+	var bs []byte
+	bs, err = hex.DecodeString(string(text))
+	copy(t[:], bs)
 	return
 }
 func (t CTypeUint256) bigInt() *big.Int {
@@ -75,6 +91,12 @@ func (t CTypeUint256) MarshalText() (d []byte, err error) {
 	ds := hex.EncodeToString(t[:])
 	d = make([]byte, len(ds))
 	copy(d[:], ds[:])
+	return
+}
+func (t *CTypeUint256) UnmarshalText(text []byte) (err error) {
+	var bs []byte
+	bs, err = hex.DecodeString(string(text))
+	copy(t[:], bs)
 	return
 }
 
@@ -88,10 +110,12 @@ func (t CTypeString) MarshalText() (d []byte, err error) {
 	copy(d[:], ds[:])
 	return
 }
-func (t *CTypeString) UnmarshalText(text []byte) error {
+func (t *CTypeString) UnmarshalText(text []byte) (err error) {
+	var bs []byte
+	bs, err = hex.DecodeString(string(text))
 	*t = make([]byte, len(text))
-	copy(*t, text)
-	return nil
+	copy(*t, bs)
+	return
 }
 func (t CTypeAddress) MarshalText() (d []byte, err error) {
 	ds := hex.EncodeToString(t[:])
@@ -100,23 +124,25 @@ func (t CTypeAddress) MarshalText() (d []byte, err error) {
 	return
 }
 
-func (t CTypeAddress) UnmarshalText(text []byte) error {
-	copy(t[:], text)
-	return nil
+func (t *CTypeAddress) UnmarshalText(text []byte) (err error) {
+	var bs []byte
+	bs, err = hex.DecodeString(string(text))
+	copy(t[:], bs)
+	return
 }
 func (t CTypeAddress) address() common.Address {
 	return common.Bytes2Address(t[:])
 }
 
 func (t CTypeBool) bool() bool {
-	if t == 1 {
+	if t[0] == 1 {
 		return true
 	}
 	return false
 }
 
 func newUint8(n uint8) CTypeUint8 {
-	return CTypeUint8(n)
+	return CTypeUint8{n}
 }
 
 func newUint16(n uint16) (m CTypeUint16) {

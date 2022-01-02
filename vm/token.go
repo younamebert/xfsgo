@@ -7,11 +7,11 @@ import (
 
 type token struct {
 	BuiltinContract
-	Name        CTypeString                   `contract:"storage" json:"name"`
-	Symbol      CTypeString                   `contract:"storage" json:"symbol"`
-	Decimals    CTypeUint8                    `contract:"storage" json:"decimals"`
-	TotalSupply CTypeUint256                  `contract:"storage" json:"totalSupply"`
-	Balances    map[CTypeAddress]CTypeUint256 `contract:"storage" json:"balances"`
+	Name        CTypeString                   `contract:"storage"`
+	Symbol      CTypeString                   `contract:"storage"`
+	Decimals    CTypeUint8                    `contract:"storage"`
+	TotalSupply CTypeUint256                  `contract:"storage"`
+	Balances    map[CTypeAddress]CTypeUint256 `contract:"storage"`
 }
 
 func (t *token) Create(
@@ -23,8 +23,6 @@ func (t *token) Create(
 	t.Symbol = symbol
 	t.Decimals = decimals
 	t.TotalSupply = totalSupply
-	t.Balances = make(map[CTypeAddress]CTypeUint256)
-	t.Balances[CTypeAddress{0x01}] = CTypeUint256{0x02}
 	return nil
 }
 
@@ -51,14 +49,14 @@ func (t *token) BalanceOf(common.Address) CTypeUint256 {
 	return CTypeUint256{}
 }
 func (t *token) Transfer(addr common.Address, val CTypeUint256) CTypeBool {
-	return CTypeBool(0)
+	return CTypeBool{}
 }
 func (t *token) TransferFrom(common.Address, common.Address, *big.Int) CTypeBool {
-	return CTypeBool(0)
+	return CTypeBool{}
 }
 func (t *token) Approve(common.Address, *big.Int) CTypeBool {
-	return CTypeBool(0)
+	return CTypeBool{}
 }
 func (t *token) Allowance(common.Address, common.Address) CTypeBool {
-	return CTypeBool(0)
+	return CTypeBool{}
 }

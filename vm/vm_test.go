@@ -95,14 +95,14 @@ var (
 		buf := NewBuffer(nil)
 		writeStringParams(buf, name)
 		writeStringParams(buf, symbol)
-		_, _ = buf.Write([]byte{byte(decimals)})
+		_, _ = buf.Write(decimals[:])
 		_, _ = buf.Write(totalSupply[:])
 		return buf.Bytes()
 	}
 	testAbTokenCreateParams = tokenCreateParams(
 		CTypeString("AbCoin"),
 		CTypeString("AB"),
-		18,
+		CTypeUint8{10},
 		newUint256(new(big.Int).SetInt64(100)))
 )
 
@@ -118,6 +118,7 @@ func TestXvm_Create(t *testing.T) {
 		t.Fatal(err)
 	}
 	vm2 := NewXVM(st)
+	_ = vm2
 	nonce := vm2.stateTree.GetNonce(addr)
 	caddr := crypto.CreateAddress(addr.Hash(), nonce)
 	if err := vm2.Call(caddr, tokenGetNameFnHash); err != nil {

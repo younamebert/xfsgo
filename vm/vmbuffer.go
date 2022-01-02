@@ -137,7 +137,7 @@ func (b *buffer) ReadUint8() (n CTypeUint8, e error) {
 	if e != nil {
 		return
 	}
-	return CTypeUint8(r[0]), nil
+	return CTypeUint8{r[0]}, nil
 }
 
 func (b *buffer) ReadUint16() (n CTypeUint16, e error) {

@@ -75,7 +75,7 @@ func (ce *builtinContractExec) call(fn reflect.Method, fnv reflect.Value, input 
 			if err != nil {
 				return err
 			}
-			s, err := buf.ReadString(int(ssize.uint32()))
+			s, err := buf.ReadString(int(ssize.Uint32()))
 			if err != nil {
 				return err
 			}

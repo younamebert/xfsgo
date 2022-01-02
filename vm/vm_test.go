@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"math/big"
 	"testing"
+	"xfsgo/assert"
 	"xfsgo/common"
 	"xfsgo/common/ahash"
 	"xfsgo/crypto"
@@ -56,13 +57,6 @@ func newTestStateTree() *testStateTree {
 	}
 }
 
-func newTestTokenStateTreeN() *testStateTree {
-	st := &testStateTree{
-		data: make(map[[32]byte][]byte),
-	}
-	return st
-}
-
 func readBytes4hex(s string) ([]byte, error) {
 	return hex.DecodeString(s)
 }
@@ -81,29 +75,33 @@ func writeStringParams(w Buffer, s CTypeString) {
 	_, _ = w.Write(s)
 }
 
+type testToken struct {
+	name        CTypeString
+	symbol      CTypeString
+	decimals    CTypeUint8
+	totalSupply CTypeUint256
+}
+
 var (
 	tokenCode = []byte{
 		0xd0, 0x23, 0x01,
 	}
-	tokenCreateFnHash  = mustReadBytes4hex("4759498ac2a719c619e2c8cf8ee60af2d2407425e95d308eb208425b2a6d427a")
-	tokenGetNameFnHash = mustReadBytes4hex("4759498ac2a719c619e2c8cf8ee60af2d2407425e95d308eb208425b2a6d427a")
-	tokenCreateParams  = func(
-		name CTypeString,
-		symbol CTypeString,
-		decimals CTypeUint8,
-		totalSupply CTypeUint256) (d []byte) {
+	tokenCreateFnHash = mustReadBytes4hex("4759498ac2a719c619e2c8cf8ee60af2d2407425e95d308eb208425b2a6d427a")
+	tokenCreateParams = func(tt testToken) (d []byte) {
 		buf := NewBuffer(nil)
-		writeStringParams(buf, name)
-		writeStringParams(buf, symbol)
-		_, _ = buf.Write(decimals[:])
-		_, _ = buf.Write(totalSupply[:])
+		writeStringParams(buf, tt.name)
+		writeStringParams(buf, tt.symbol)
+		_, _ = buf.Write(tt.decimals[:])
+		_, _ = buf.Write(tt.totalSupply[:])
 		return buf.Bytes()
 	}
-	testAbTokenCreateParams = tokenCreateParams(
-		CTypeString("AbCoin"),
-		CTypeString("AB"),
-		CTypeUint8{10},
-		newUint256(new(big.Int).SetInt64(100)))
+	testACToken = testToken{
+		name:        CTypeString("AbCoin"),
+		symbol:      CTypeString("AC"),
+		decimals:    NewUint8(10),
+		totalSupply: NewUint256(new(big.Int).SetInt64(100)),
+	}
+	testAbTokenCreateParams = tokenCreateParams(testACToken)
 )
 
 func TestXvm_Create(t *testing.T) {
@@ -123,13 +121,17 @@ func TestXvm_Create(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tc := bc.(*token)
-	tname := tc.GetName()
-	tsy := tc.GetSymbol()
-	decs := tc.GetDecimals()
-	t.Logf("tokenName: %s", tname.string())
-	t.Logf("tokenSymbol: %s", tsy.string())
-	t.Logf("tokenDecimals: %d", decs.uint8())
+	tc, ok := bc.(*token)
+	if !ok {
+		t.Fatalf("cover token contract err")
+	}
+	gotobj := testToken{
+		name:        tc.GetName(),
+		symbol:      tc.GetSymbol(),
+		decimals:    tc.GetDecimals(),
+		totalSupply: tc.GetTotalSupply(),
+	}
+	assert.Equal(t, gotobj, testACToken)
 }
 
 func TestXvm_Run(t *testing.T) {

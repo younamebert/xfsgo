@@ -33,15 +33,10 @@ func (t *CTypeUint8) UnmarshalText(text []byte) (err error) {
 	return
 }
 
-func (t CTypeUint16) uint16() uint16 {
+func (t CTypeUint16) Uint16() uint16 {
 	return binary.LittleEndian.Uint16(t[:])
 }
 
-func (t CTypeUint16) Encode() (d []byte, err error) {
-	d = make([]byte, len(t))
-	copy(d[:], t[:])
-	return
-}
 func (t CTypeUint16) MarshalText() (d []byte, err error) {
 	ds := hex.EncodeToString(t[:])
 	d = make([]byte, len(ds))
@@ -54,7 +49,7 @@ func (t *CTypeUint16) UnmarshalText(text []byte) (err error) {
 	copy(t[:], bs)
 	return
 }
-func (t CTypeUint32) uint32() uint32 {
+func (t CTypeUint32) Uint32() uint32 {
 	return binary.LittleEndian.Uint32(t[:])
 }
 func (t CTypeUint32) MarshalText() (d []byte, err error) {
@@ -69,7 +64,7 @@ func (t *CTypeUint32) UnmarshalText(text []byte) (err error) {
 	copy(t[:], bs)
 	return
 }
-func (t CTypeUint64) uint64() uint64 {
+func (t CTypeUint64) Uint64() uint64 {
 	return binary.LittleEndian.Uint64(t[:])
 }
 func (t CTypeUint64) MarshalText() (d []byte, err error) {
@@ -84,7 +79,7 @@ func (t *CTypeUint64) UnmarshalText(text []byte) (err error) {
 	copy(t[:], bs)
 	return
 }
-func (t CTypeUint256) bigInt() *big.Int {
+func (t CTypeUint256) BigInt() *big.Int {
 	return new(big.Int).SetBytes(t[:])
 }
 func (t CTypeUint256) MarshalText() (d []byte, err error) {
@@ -100,7 +95,7 @@ func (t *CTypeUint256) UnmarshalText(text []byte) (err error) {
 	return
 }
 
-func (t CTypeString) string() string {
+func (t CTypeString) String() string {
 	return string(t[:])
 }
 
@@ -130,36 +125,36 @@ func (t *CTypeAddress) UnmarshalText(text []byte) (err error) {
 	copy(t[:], bs)
 	return
 }
-func (t CTypeAddress) address() common.Address {
+func (t CTypeAddress) Address() common.Address {
 	return common.Bytes2Address(t[:])
 }
 
-func (t CTypeBool) bool() bool {
+func (t CTypeBool) Bool() bool {
 	if t[0] == 1 {
 		return true
 	}
 	return false
 }
 
-func newUint8(n uint8) CTypeUint8 {
+func NewUint8(n uint8) CTypeUint8 {
 	return CTypeUint8{n}
 }
 
-func newUint16(n uint16) (m CTypeUint16) {
+func NewUint16(n uint16) (m CTypeUint16) {
 	binary.LittleEndian.PutUint16(m[:], n)
 	return
 }
 
-func newUint32(n uint32) (m CTypeUint32) {
+func NewUint32(n uint32) (m CTypeUint32) {
 	binary.LittleEndian.PutUint32(m[:], n)
 	return
 }
-func newUint64(n uint64) (m CTypeUint64) {
+func NewUint64(n uint64) (m CTypeUint64) {
 	binary.LittleEndian.PutUint64(m[:], n)
 	return
 }
 
-func newUint256(n *big.Int) (m CTypeUint256) {
+func NewUint256(n *big.Int) (m CTypeUint256) {
 	bs := n.Bytes()
 	copy(m[:], bs)
 	return

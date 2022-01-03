@@ -26,6 +26,14 @@ func (t *token) Create(
 	return nil
 }
 
+//func (t *token) Constructor(func()) error {
+//	t.Name = name
+//	t.Symbol = symbol
+//	t.Decimals = decimals
+//	t.TotalSupply = totalSupply
+//	return nil
+//}
+
 func (t *token) BuiltinId() uint8 {
 	return 0x01
 }

@@ -38,9 +38,7 @@ func NewXVM(st core.StateTree) *xvm {
 		builtins:  make(map[uint8]reflect.Type),
 		returnBuf: NewBuffer(nil),
 	}
-	tk := new(token)
-	tk.BuiltinContract = StdBuiltinContract()
-	vm.registerBuiltinId(tk)
+	vm.registerBuiltinId(new(token))
 	return vm
 }
 func (vm *xvm) newBuiltinContractExec(id uint8, address common.Address, code []byte) (*builtinContractExec, error) {

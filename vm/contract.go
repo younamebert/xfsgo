@@ -5,10 +5,6 @@ import (
 	"xfsgo/core"
 )
 
-type ContractPayload interface {
-	Create()
-}
-
 type ContractHelper interface {
 	SetStateTree(st core.StateTree)
 	GetStateTree() (st core.StateTree)
@@ -49,5 +45,9 @@ func (abs *absBuiltinContract) GetStateTree() (st core.StateTree) {
 }
 
 func (abs *absBuiltinContract) BuiltinId() (id uint8) {
+	return
+}
+
+func (abs *absBuiltinContract) Create(func()) (err error) {
 	return
 }

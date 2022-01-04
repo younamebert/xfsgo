@@ -25,13 +25,14 @@ import (
 	"strconv"
 	"xfsgo"
 	"xfsgo/common"
+	"xfsgo/core"
 	"xfsgo/crypto"
 
 	"github.com/sirupsen/logrus"
 )
 
 type ChainAPIHandler struct {
-	BlockChain    *xfsgo.BlockChain
+	CoreChain     *core.CoreChain
 	TxPendingPool *xfsgo.TxPool
 	number        int
 }
@@ -118,7 +119,7 @@ type SendTransactionArgs struct {
 func (handler *ChainAPIHandler) GetBlockByNumber(args GetBlockByNumArgs, resp **BlockResp) error {
 	var last uint64
 	if args.Number == "" {
-		last = handler.BlockChain.CurrentBHeader().Height
+		last = handler.CoreChain.Chain.CurrentBHeader().Height
 	} else {
 		number, ok := new(big.Int).SetString(args.Number, 0)
 		if !ok {
@@ -126,7 +127,7 @@ func (handler *ChainAPIHandler) GetBlockByNumber(args GetBlockByNumArgs, resp **
 		}
 		last = number.Uint64()
 	}
-	gotBlock := handler.BlockChain.GetBlockByNumber(last)
+	gotBlock := handler.CoreChain.Chain.GetBlockByNumber(last)
 	return coverBlock2Resp(gotBlock, resp)
 }
 
@@ -139,19 +140,19 @@ func (handler *ChainAPIHandler) GetBlockByNumber(args GetBlockByNumArgs, resp **
 // 		return xfsgo.NewRPCError(-1006, "number format error")
 // 	}
 // 	numbern := number.Uint64()
-// 	gotBlocks := handler.BlockChain.GetBlocksFromNumber(numbern)
+// 	gotBlocks := handler.CoreChain.Chain.GetBlocksFromNumber(numbern)
 // 	return coverBlocks2Resp(gotBlocks, resp)
 // }
 
 func (handler *ChainAPIHandler) Head(_ EmptyArgs, resp **BlockHeaderResp) error {
-	gotBlock := handler.BlockChain.GetHead()
+	gotBlock := handler.CoreChain.Chain.GetHead()
 	return coverBlockHeader2Resp(gotBlock, resp)
 }
 
 func (handler *ChainAPIHandler) GetBlockHeaderByNumber(args GetBlockHeaderByNumberArgs, resp **BlockHeaderResp) error {
 	var last uint64
 	if args.Number == "" {
-		last = handler.BlockChain.CurrentBHeader().Height
+		last = handler.CoreChain.Chain.CurrentBHeader().Height
 	} else {
 		number, ok := new(big.Int).SetString(args.Number, 0)
 		if !ok {
@@ -159,7 +160,7 @@ func (handler *ChainAPIHandler) GetBlockHeaderByNumber(args GetBlockHeaderByNumb
 		}
 		last = number.Uint64()
 	}
-	gotBlock := handler.BlockChain.GetBlockByNumber(last)
+	gotBlock := handler.CoreChain.Chain.GetBlockByNumber(last)
 	return coverBlockHeader2Resp(gotBlock, resp)
 }
 
@@ -170,7 +171,7 @@ func (handler *ChainAPIHandler) GetBlockHeaderByHash(args GetBlockHeaderByHashAr
 	if err := common.HashCalibrator(args.Hash); err != nil {
 		return xfsgo.NewRPCErrorCause(-32001, err)
 	}
-	goBlock := handler.BlockChain.GetBlockByHash(common.Hex2Hash(args.Hash))
+	goBlock := handler.CoreChain.Chain.GetBlockByHash(common.Hex2Hash(args.Hash))
 	return coverBlockHeader2Resp(goBlock, resp)
 }
 
@@ -181,7 +182,7 @@ func (handler *ChainAPIHandler) GetBlockByHash(args GetBlockByHashArgs, resp **B
 	if err := common.HashCalibrator(args.Hash); err != nil {
 		return xfsgo.NewRPCErrorCause(-32001, err)
 	}
-	gotBlock := handler.BlockChain.GetBlockByHash(common.Hex2Hash(args.Hash))
+	gotBlock := handler.CoreChain.Chain.GetBlockByHash(common.Hex2Hash(args.Hash))
 	return coverBlock2Resp(gotBlock, resp)
 
 }
@@ -189,7 +190,7 @@ func (handler *ChainAPIHandler) GetBlockByHash(args GetBlockByHashArgs, resp **B
 func (handler *ChainAPIHandler) GetTxsByBlockNum(args GetTxsByBlockNumArgs, resp **TransactionsResp) error {
 	var last uint64
 	if args.Number == "" {
-		last = handler.BlockChain.CurrentBHeader().Height
+		last = handler.CoreChain.Chain.CurrentBHeader().Height
 	} else {
 		number, ok := new(big.Int).SetString(args.Number, 0)
 		if !ok {
@@ -197,7 +198,7 @@ func (handler *ChainAPIHandler) GetTxsByBlockNum(args GetTxsByBlockNumArgs, resp
 		}
 		last = number.Uint64()
 	}
-	blk := handler.BlockChain.GetBlockByNumber(last)
+	blk := handler.CoreChain.Chain.GetBlockByNumber(last)
 	if blk == nil {
 		return xfsgo.NewRPCError(-1006, "Not found block")
 	}
@@ -211,7 +212,7 @@ func (handler *ChainAPIHandler) GetTxsByBlockHash(args GetTxbyBlockHashArgs, res
 	if err := common.HashCalibrator(args.Hash); err != nil {
 		return xfsgo.NewRPCErrorCause(-32001, err)
 	}
-	blk := handler.BlockChain.GetBlockByHash(common.Hex2Hash(args.Hash))
+	blk := handler.CoreChain.Chain.GetBlockByHash(common.Hex2Hash(args.Hash))
 	if blk == nil {
 		return xfsgo.NewRPCError(-1006, "Not found block")
 	}
@@ -228,17 +229,17 @@ func (handler *ChainAPIHandler) GetReceiptByHash(args GetReceiptByHashArgs, resp
 
 	var from common.Address
 	var to common.Address
-	tx := handler.BlockChain.GetTransactionByTxHash(common.Hex2Hash(args.Hash))
+	tx := handler.CoreChain.Chain.GetTransactionByTxHash(common.Hex2Hash(args.Hash))
 	if tx != nil {
 		from, _ = tx.FromAddr()
 		to = tx.To
 	}
 
-	dataReceipt := handler.BlockChain.GetReceiptByHash(common.Hex2Hash(args.Hash))
+	dataReceipt := handler.CoreChain.Chain.GetReceiptByHash(common.Hex2Hash(args.Hash))
 	if dataReceipt == nil {
 		return xfsgo.NewRPCError(-1006, "Not found")
 	}
-	dataReceiptIndex := handler.BlockChain.GetReceiptByHashIndex(common.Hex2Hash(args.Hash))
+	dataReceiptIndex := handler.CoreChain.Chain.GetReceiptByHashIndex(common.Hex2Hash(args.Hash))
 	if dataReceiptIndex == nil {
 		return xfsgo.NewRPCError(-1006, "Not found")
 	}
@@ -266,7 +267,7 @@ func (handler *ChainAPIHandler) GetTransaction(args GetTransactionArgs, resp **T
 		return xfsgo.NewRPCErrorCause(-32001, err)
 	}
 	ID := common.Hex2Hash(args.Hash)
-	data := handler.BlockChain.GetTransactionByTxHash(ID)
+	data := handler.CoreChain.Chain.GetTransactionByTxHash(ID)
 	return coverTx2Resp(data, resp)
 }
 
@@ -276,8 +277,8 @@ func (handler *ChainAPIHandler) GetTransaction(args GetTransactionArgs, resp **T
 // - currentBlock:  block number this node is currently importing
 // - highestBlock:  block number of the highest block header this node has received from peers
 func (handler *ChainAPIHandler) GetSyncStatus(_ EmptyArgs, resp *ChainStatusResp) error {
-	current := handler.BlockChain.CurrentBHeader().Height
-	origin, height := handler.BlockChain.Boundaries()
+	current := handler.CoreChain.Chain.CurrentBHeader().Height
+	origin, height := handler.CoreChain.Chain.Boundaries()
 
 	var result *ChainStatusResp = nil
 	if current < height {
@@ -314,7 +315,7 @@ func (handler *ChainAPIHandler) ExportBlocks(args GetBlocksByRangeArgs, resp *st
 	}
 
 	if args.Count == "" {
-		blockHeight := handler.BlockChain.CurrentBHeader().Height
+		blockHeight := handler.CoreChain.Chain.CurrentBHeader().Height
 		numbersCount = new(big.Int).SetUint64(blockHeight)
 	} else {
 		numbersCount, ok = new(big.Int).SetString(args.Count, 0)
@@ -324,15 +325,15 @@ func (handler *ChainAPIHandler) ExportBlocks(args GetBlocksByRangeArgs, resp *st
 	}
 
 	if numbersCount.Uint64() == uint64(0) {
-		b := handler.BlockChain.GetHead()
+		b := handler.CoreChain.Chain.GetHead()
 		numbersCount.SetUint64(b.Height())
 	}
 
 	if numbersForm.Uint64() >= numbersCount.Uint64() { // Export all
-		b := handler.BlockChain.GetHead()
+		b := handler.CoreChain.Chain.GetHead()
 		numbersCount.SetUint64(b.Header.Height)
 	}
-	data := handler.BlockChain.GetBlocks(numbersForm.Uint64(), numbersCount.Uint64())
+	data := handler.CoreChain.Chain.GetBlocks(numbersForm.Uint64(), numbersCount.Uint64())
 	encodeByte, err := json.Marshal(data)
 	if err != nil {
 		return xfsgo.NewRPCErrorCause(-32001, err)
@@ -374,7 +375,7 @@ func (handler *ChainAPIHandler) ImportBlock(args GetBlocksArgs, resp *string) er
 	handler.number = len(blockChain) - 1
 
 	for _, item := range blockChain {
-		if err = handler.BlockChain.InsertChain(item); err != nil {
+		if err = handler.CoreChain.InsertChain(item); err != nil {
 			logrus.Errorf("Import block err: %v", err)
 			continue
 		}
@@ -396,7 +397,7 @@ func (handler *ChainAPIHandler) GetBlockTxCountByHash(args GetBlockTxCountByHash
 	if err := common.HashCalibrator(args.Hash); err != nil {
 		return xfsgo.NewRPCErrorCause(-32001, err)
 	}
-	gotBlock := handler.BlockChain.GetBlockByHash(common.Hex2Hash(args.Hash))
+	gotBlock := handler.CoreChain.Chain.GetBlockByHash(common.Hex2Hash(args.Hash))
 	result := len(gotBlock.Transactions)
 	*resp = result
 	return nil
@@ -410,7 +411,7 @@ func (handler *ChainAPIHandler) GetBlockTxCountByNum(args GetBlockTxCountByNumAr
 	if !ok {
 		return xfsgo.NewRPCError(-1006, "number to big.Int Error")
 	}
-	gotBlock := handler.BlockChain.GetBlockByNumber(number.Uint64())
+	gotBlock := handler.CoreChain.Chain.GetBlockByNumber(number.Uint64())
 	result := len(gotBlock.Transactions)
 	*resp = result
 	return nil
@@ -425,7 +426,7 @@ func (handler *ChainAPIHandler) GetBlockTxByHashAndIndex(args GetBlockTxByHashAn
 		return xfsgo.NewRPCErrorCause(-32001, err)
 	}
 
-	gotBlock := handler.BlockChain.GetBlockByHash(common.Hex2Hash(args.Hash))
+	gotBlock := handler.CoreChain.Chain.GetBlockByHash(common.Hex2Hash(args.Hash))
 	maxTxNumber := len(gotBlock.Transactions)
 	if args.Index > maxTxNumber {
 		return xfsgo.NewRPCError(-1006, "Block not found, the index transaction")
@@ -442,7 +443,7 @@ func (handler *ChainAPIHandler) GetBlockTxByNumAndIndex(args GetBlockTxByNumAndI
 	if !ok {
 		return xfsgo.NewRPCError(-1006, "number to big.Int Error")
 	}
-	gotBlock := handler.BlockChain.GetBlockByNumber(number.Uint64())
+	gotBlock := handler.CoreChain.Chain.GetBlockByNumber(number.Uint64())
 	maxTxNumber := len(gotBlock.Transactions)
 	if args.Index > maxTxNumber {
 		return xfsgo.NewRPCError(-1006, "Block not found, the index transaction")
@@ -532,24 +533,24 @@ func (handler *WalletHandler) ContractCall(args SendTransactionArgs, resp *strin
 	}
 	data := args.Code
 
-	receipt := handler.BlockChain.GetReceiptByHash(common.Hex2Hash(args.Hash))
+	receipt := handler.CoreChain.Chain.GetReceiptByHash(common.Hex2Hash(args.Hash))
 	if receipt == nil {
 		return xfsgo.NewRPCErrorCause(-1006, fmt.Errorf("receipt is nil"))
 	}
 
-	blockIndex := handler.BlockChain.GetReceiptByHashIndex(common.Hex2Hash(args.Hash))
+	blockIndex := handler.CoreChain.Chain.GetReceiptByHashIndex(common.Hex2Hash(args.Hash))
 	if blockIndex == nil {
 		return xfsgo.NewRPCErrorCause(-1006, fmt.Errorf("blockIndex is nil"))
 	}
-	block := handler.BlockChain.GetBlockByHash(blockIndex.BlockHash)
+	block := handler.CoreChain.Chain.GetBlockByHash(blockIndex.BlockHash)
 	if block == nil {
 		return xfsgo.NewRPCErrorCause(-1006, fmt.Errorf("block is nil"))
 	}
-	statetree := handler.BlockChain.StateAt(block.Header.StateRoot)
+	statetree := handler.CoreChain.Chain.StateAt(block.Header.StateRoot)
 
 	msg := xfsgo.NewMessage(fromAddr, receipt.ContractAddress, 0, value, tx.GasLimit.Uint64(), tx.GasPrice, common.Hex2bytes(data), true)
 
-	evm, err := handler.BlockChain.GetEVM(msg, statetree, block.Header)
+	evm, err := handler.CoreChain.Chain.GetEVM(msg, statetree, block.Header)
 	if err != nil {
 		return xfsgo.NewRPCErrorCause(-1006, err)
 	}

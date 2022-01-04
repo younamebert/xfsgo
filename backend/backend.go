@@ -26,6 +26,7 @@ import (
 	"xfsgo/common"
 	"xfsgo/consensus"
 	"xfsgo/consensus/dpos"
+	"xfsgo/core"
 	"xfsgo/miner"
 	"xfsgo/node"
 	"xfsgo/p2p"
@@ -150,6 +151,11 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 		return nil, err
 	}
 
+	coreChain := &core.CoreChain{
+		Chain:  back.blockchain,
+		Engine: dpos,
+	}
+
 	back.wallet = xfsgo.NewWallet(back.config.KeysDB)
 	back.txPool = xfsgo.NewTxPool(
 		back.blockchain.CurrentStateTree,
@@ -190,7 +196,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 	if err = stack.RegisterBackend(
 		back.config.StateDB,
 		back.config.ChainDB,
-		back.blockchain,
+		coreChain,
 		back.miner,
 		dpos,
 		back.wallet,

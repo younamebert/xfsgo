@@ -23,11 +23,12 @@ import (
 	"sort"
 	"xfsgo"
 	"xfsgo/common"
+	"xfsgo/core"
 )
 
 type WalletHandler struct {
 	Wallet        *xfsgo.Wallet
-	BlockChain    *xfsgo.BlockChain
+	CoreChain     *core.CoreChain
 	TxPendingPool *xfsgo.TxPool
 }
 

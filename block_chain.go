@@ -50,7 +50,7 @@ const (
 var (
 	baseSubsidy, _        = new(big.Int).SetString("93755722410000000000", 10)
 	baseTestSubsidy, _    = common.BaseCoin2Atto("14")
-	GasPoolOutErr         = errors.New("gas pool out err")
+	ErrGasPoolOutErr      = errors.New("gas pool out err")
 	ErrBlockIgnored       = errors.New("block hash ignore")
 	ErrBadBlock           = errors.New("bad block")
 	ErrApplyTransactions  = errors.New("apply transactions err")
@@ -144,8 +144,6 @@ type BlockChain struct {
 	syncStatsHeight uint64       // Highest block number known when syncing started
 	syncStatsLock   sync.RWMutex // Lock protecting the sync stats fields
 
-	// engine    consensus.Engine
-	// validator validate.Validator // block and state validator interface
 	vmConfig vm.Config
 }
 
@@ -172,7 +170,7 @@ func NewBlockChainN(stateDB, chainDB, extraDB badger.IStorage, eventBus *EventBu
 	if err := bc.setLastState(); err != nil {
 		return nil, err
 	}
-	stateRootHash := bc.currentBHeader.StateRoot
+	stateRootHash := bc.currentBHeader.GetStateRoot()
 	bc.stateTree = NewStateTree(stateDB, stateRootHash.Bytes())
 	return bc, nil
 }
@@ -262,13 +260,6 @@ func (bc *BlockChain) GetReceiptByHash(hash common.Hash) *Receipt {
 
 }
 
-// SetValidator sets the validator which is used to validate incoming blocks.
-// func (bc *BlockChain) SetValidator(validator Validator) {
-// 	bc.mu.RLock()
-// 	defer bc.mu.RUnlock()
-// 	bc.validator = validator
-// }
-
 func (bc *BlockChain) GetReceiptByHashIndex(hash common.Hash) *TxIndex {
 	return bc.extraDB.GetReceiptByHashIndex(hash)
 }
@@ -324,7 +315,7 @@ func (bc *BlockChain) CurrentBlock() *Block {
 func (bc *BlockChain) LatestGasLimit() *big.Int {
 	bc.mu.RLock()
 	defer bc.mu.RUnlock()
-	return bc.currentBHeader.GasLimit
+	return bc.currentBHeader.GetGasLimit()
 }
 
 func (bc *BlockChain) LastBlockHash() common.Hash {
@@ -401,7 +392,7 @@ func (bc *BlockChain) writeBlock(block *Block) error {
 		return fmt.Errorf("current chain has no head")
 	}
 
-	if block.Height() > bHeader.Height {
+	if block.Height() > bHeader.HeadHeight() {
 		curHash := bHeader.HeaderHash()
 		bhash := block.HeaderHash()
 		prehash := block.HashPrevBlock()
@@ -411,7 +402,7 @@ func (bc *BlockChain) writeBlock(block *Block) error {
 
 			transactions := bc.GetBlockTransactionsByBHash(bHeader.HeaderHash())
 			receipts := bc.GetBlockReceiptsByBHash(bHeader.HeaderHash())
-			curBlock := &Block{Header: bHeader, Transactions: transactions, Receipts: receipts}
+			curBlock := &Block{Header: bHeader.GetHead(), Transactions: transactions, Receipts: receipts}
 			// fmt.Printf("reorg curblock:%v block:%v\n", curBlock, block)
 			if err := bc.reorg(curBlock, block); err != nil {
 				return err
@@ -670,6 +661,11 @@ func (bc *BlockChain) maybeAcceptBlock(block *Block) error {
 		return ErrBadBlock
 	}
 
+	if err := bc.ValidateDposState(block); err != nil {
+		logrus.Error(err)
+		return ErrBadBlock
+	}
+
 	parent := bc.GetBlockByHash(block.HashPrevBlock())
 	//parenthash := parent.Hash()
 	parentStateRoot := parent.StateRoot()
@@ -689,11 +685,11 @@ func (bc *BlockChain) maybeAcceptBlock(block *Block) error {
 	if gas.Cmp(header.GasUsed) != 0 {
 		return ErrBadBlock
 	}
+
 	targetRsRoot := CalcReceiptRootHash(rec)
 	if !bytes.Equal(rsRoot[:], targetRsRoot[:]) {
 		return ErrBadBlock
 	}
-	AccumulateRewards(stateTree, header)
 	stateTree.UpdateAll()
 	if err = stateTree.Commit(); err != nil {
 		logrus.Errorf("Accept block err: %v", err)
@@ -702,6 +698,16 @@ func (bc *BlockChain) maybeAcceptBlock(block *Block) error {
 	if err = bc.writeBlock(block); err != nil {
 		logrus.Errorf("Accept block err: %v", err)
 		return ErrWriteBlock
+	}
+	return nil
+}
+
+func (v *BlockChain) ValidateDposState(block *Block) error {
+	header := block.GetHeader()
+	localRoot := block.DposCtx().Root()
+	remoteRoot := header.DposContext.Root()
+	if remoteRoot != localRoot {
+		return fmt.Errorf("invalid dpos root (remote: %x local: %x)", remoteRoot, localRoot)
 	}
 	return nil
 }
@@ -754,23 +760,6 @@ func (bc *BlockChain) InsertChain(block *Block) error {
 		return ErrBadBlock
 	}
 
-	// //update name:bert
-	// if err := bc.validator.ValidateBody(parent); err != nil {
-	// 	return err
-	// }
-
-	// // Validate the dpos state using the default validator
-	// if err := bc.validator.ValidateDposState(parent); err != nil {
-	// 	return err
-	// }
-	// Validate validator
-	// dposEngine, isDpos := bc.engine.(*dpos.Dpos)
-	// if isDpos {
-	// 	err := dposEngine.VerifySeal(bc, parent.GetHeader())
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
 	if err := bc.maybeAcceptBlock(block); err != nil {
 		logrus.Errorf("Insert Chain err: %s", err)
 		return err
@@ -921,11 +910,11 @@ func (bc *BlockChain) ApplyTransactions(stateTree *StateTree, block *Block, txs 
 }
 
 func (bc *BlockChain) checkBlockHeaderSanity(prev, header *BlockHeader, blockHash common.Hash) error {
-	target := BitsUnzip(header.Bits)
+	target := BitsUnzip(header.GetBits())
 	if target.Sign() <= 0 {
 		return fmt.Errorf("bits must be a non-negative integer")
 	}
-	max := BitsUnzip(bc.genesisBHeader.Bits)
+	max := BitsUnzip(bc.genesisBHeader.GetBits())
 	//target difficuty should be less than the minimum difficuty based on the genesisBlock
 	if target.Cmp(max) > 0 {
 		return fmt.Errorf("pow check err")
@@ -935,11 +924,11 @@ func (bc *BlockChain) checkBlockHeaderSanity(prev, header *BlockHeader, blockHas
 	if current.Cmp(target) > 0 {
 		return fmt.Errorf("pow check err")
 	}
-	last, err := bc.calcNextRequiredBitsByHeight(prev.Height)
+	last, err := bc.calcNextRequiredBitsByHeight(prev.HeadHeight())
 	if err != nil {
 		return err
 	}
-	if last != header.Bits {
+	if last != header.GetBits() {
 		return fmt.Errorf("pow check err")
 	}
 	return nil
@@ -1003,7 +992,7 @@ func TxToAddrNotSet(tx *Transaction) bool {
 
 func (bc *BlockChain) GetBlockHashes(from uint64, count uint64) []common.Hash {
 	bc.mu.Lock()
-	curHeight := bc.currentBHeader.Height
+	curHeight := bc.currentBHeader.HeadHeight()
 	bc.mu.RUnlock()
 	if from+count > curHeight {
 		count = curHeight
@@ -1034,7 +1023,7 @@ func (bc *BlockChain) GetBlockHashesFromHash(hash common.Hash, max uint64) (chai
 }
 func (bc *BlockChain) GetBlocks(from uint64, count uint64) []*Block {
 	bc.mu.RLock()
-	curheight := bc.currentBHeader.Height
+	curheight := bc.currentBHeader.HeadHeight()
 	bc.mu.RUnlock()
 	if from+count > curheight {
 		count = curheight
@@ -1111,7 +1100,7 @@ func (bc *BlockChain) calcNextRequiredBitsByHeight(height uint64) (uint32, error
 	oldTarget := BitsUnzip(lastHeader.Bits)
 	newTarget := new(big.Int).Mul(oldTarget, big.NewInt(adjustedTimespan))
 	newTarget.Div(newTarget, big.NewInt(targetTimespan))
-	newTarget.Set(common.BigMin(newTarget, BitsUnzip(bc.genesisBHeader.Bits)))
+	newTarget.Set(common.BigMin(newTarget, BitsUnzip(bc.genesisBHeader.GetBits())))
 	newTargetBits := BigByZip(newTarget)
 	return newTargetBits, nil
 }
@@ -1120,7 +1109,7 @@ func (bc *BlockChain) CalcNextRequiredDifficulty() (uint32, error) {
 	bc.mu.RLock()
 	lastHeader := bc.currentBHeader
 	bc.mu.RUnlock()
-	return bc.CalcNextRequiredBitsByHeight(lastHeader.Height)
+	return bc.CalcNextRequiredBitsByHeight(lastHeader.HeadHeight())
 }
 
 func (bc *BlockChain) CalcNextRequiredBitsByHeight(height uint64) (uint32, error) {

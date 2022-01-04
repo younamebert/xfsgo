@@ -27,6 +27,7 @@ import (
 	"xfsgo/common"
 	"xfsgo/common/rawencode"
 	"xfsgo/consensus/dpos"
+	"xfsgo/core"
 	"xfsgo/crypto"
 	"xfsgo/miner"
 	"xfsgo/p2p"
@@ -114,13 +115,13 @@ func (n *Node) Start() error {
 //RegisterBackend registers built-in APIs.
 func (n *Node) RegisterBackend(
 	stateDb, chainDb *badger.Storage,
-	bc *xfsgo.BlockChain,
+	bc *core.CoreChain,
 	miner *miner.Miner,
 	dpos *dpos.Dpos,
 	wallet *xfsgo.Wallet,
 	txPool *xfsgo.TxPool) error {
 	chainApiHandler := &api.ChainAPIHandler{
-		BlockChain:    bc,
+		CoreChain:     bc,
 		TxPendingPool: txPool,
 	}
 	minerApiHandler := &api.MinerAPIHandler{
@@ -129,7 +130,7 @@ func (n *Node) RegisterBackend(
 
 	walletApiHandler := &api.WalletHandler{
 		Wallet:        wallet,
-		BlockChain:    bc,
+		CoreChain:     bc,
 		TxPendingPool: txPool,
 	}
 

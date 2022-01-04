@@ -69,6 +69,7 @@ type Params struct {
 type Config struct {
 	*Params
 	NodeSyncFlag bool
+	ChainConfig  *params.ChainConfig
 	ChainDB      *badger.Storage
 	KeysDB       *badger.Storage
 	StateDB      *badger.Storage
@@ -88,14 +89,7 @@ func (c *chainSyncProtocol) Run(p p2p.Peer) error {
 func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 	var err error = nil
 
-	chainConfig := params.DposChainConfig
-
-	dposValis := make([]common.Address, 0)
-	dposValis = append(dposValis, common.B58ToAddress([]byte("YPJKvsirHXXtSvLtLiBHrXAoA69rgkcV2")))
-	chainConfig.Dpos = &params.DposConfig{
-		Validators: dposValis,
-	}
-	dpos := dpos.New(chainConfig.Dpos, config.ChainDB)
+	dpos := dpos.New(config.ChainConfig.Dpos, config.ChainDB)
 	back := &Backend{
 		config:    config,
 		p2pServer: stack.P2PServer(),
@@ -108,7 +102,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 		Debug:   config.Params.Debug,
 	}
 
-	geMain := xfsgo.NewGenesis(&GenesisConfig, chainConfig, xfsgo.GenesisBits)
+	geMain := xfsgo.NewGenesis(&GenesisConfig, config.ChainConfig, xfsgo.GenesisBits)
 
 	back.eventBus = xfsgo.NewEventBus()
 	if config.NetworkID == uint32(1) {
@@ -136,7 +130,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 		genesis.ChainDB = config.ChainDB
 		genesis.Debug = config.Params.Debug
 
-		genesis.Config.Dpos = chainConfig.Dpos
+		genesis.Config.Dpos = config.ChainConfig.Dpos
 		if _, err = genesis.WriteGenesisBlockN(); err != nil {
 			return nil, ErrWriteGenesisBlock
 		}
@@ -147,13 +141,13 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 
 	if back.blockchain, err = xfsgo.NewBlockChainN(
 		back.config.StateDB, back.config.ChainDB,
-		back.config.ExtraDB, back.eventBus, chainConfig, config.Debug); err != nil {
+		back.config.ExtraDB, back.eventBus, config.ChainConfig, config.Debug); err != nil {
 		return nil, err
 	}
 
 	coreChain := &core.CoreChain{
 		Chain:  back.blockchain,
-		Engine: dpos,
+		Engine: back.engine,
 	}
 
 	back.wallet = xfsgo.NewWallet(back.config.KeysDB)
@@ -187,7 +181,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 		back.txPool,
 		config.MinGasPrice,
 		common.TxPoolGasLimit,
-		dpos,
+		back.engine,
 		config.ChainDB)
 
 	logrus.Debugf("Initial miner: coinbase=%s, gasPrice=%s, gasLimit=%s",
@@ -206,7 +200,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 
 	back.syncMgr = newSyncMgr(
 		back.config.ProtocolVersion, back.config.NetworkID,
-		back.blockchain, back.eventBus, back.txPool, back.config.NodeSyncFlag)
+		coreChain, back.eventBus, back.txPool, back.config.NodeSyncFlag)
 	back.p2pServer.Bind(&chainSyncProtocol{
 		syncMgr: back.syncMgr,
 	})

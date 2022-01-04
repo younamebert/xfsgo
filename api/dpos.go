@@ -6,13 +6,14 @@ import (
 	"xfsgo/avlmerkle"
 	"xfsgo/common"
 	"xfsgo/consensus/dpos"
+	"xfsgo/core"
 	"xfsgo/storage/badger"
 )
 
 type DposAPIHandler struct {
-	Chain   *xfsgo.BlockChain
-	ChainDb *badger.Storage
-	Dpos    *dpos.Dpos
+	CoreChain *core.CoreChain
+	ChainDb   *badger.Storage
+	Dpos      *dpos.Dpos
 }
 
 type GetBlockNumByValidatorArgs struct {
@@ -24,7 +25,7 @@ func (handler *DposAPIHandler) GetValidators(args GetBlockNumByValidatorArgs, re
 	var header *xfsgo.BlockHeader
 	var last uint64
 	if args.Number == "" {
-		last = handler.Chain.CurrentBHeader().Height
+		last = handler.CoreChain.Chain.CurrentBHeader().Height
 	} else {
 		number, ok := new(big.Int).SetString(args.Number, 0)
 		if !ok {
@@ -33,7 +34,7 @@ func (handler *DposAPIHandler) GetValidators(args GetBlockNumByValidatorArgs, re
 		last = number.Uint64()
 	}
 
-	header = handler.Chain.GetBlockByNumber(last).Header
+	header = handler.CoreChain.Chain.GetBlockByNumber(last).Header
 
 	epochTrie, err := avlmerkle.NewEpochTrie(header.DposContext.EpochHash, handler.ChainDb)
 	if err != nil {
@@ -59,7 +60,7 @@ func (handler *DposAPIHandler) GetConfirmedBlockNumber(_ EmptyArgs, resp *int) e
 	var err error
 	header := handler.Dpos.ConfirmedBlockHeader()
 	if header == nil {
-		header, err = handler.Dpos.LoadConfirmedBlockHeader(handler.Chain)
+		header, err = handler.Dpos.LoadConfirmedBlockHeader(handler.CoreChain.Chain)
 		if err != nil {
 			return err
 		}

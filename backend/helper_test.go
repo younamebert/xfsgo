@@ -10,6 +10,7 @@ import (
 	"time"
 	"xfsgo"
 	"xfsgo/common"
+	"xfsgo/core"
 	"xfsgo/p2p"
 	"xfsgo/p2p/discover"
 )
@@ -41,7 +42,7 @@ func (pr *testPackReader) DataReader() io.Reader {
 
 type testPeer struct {
 	t            *testing.T
-	mgr          chainMgr
+	mgr          *core.CoreChain
 	head         common.Hash
 	height       uint64
 	id           discover.NodeId
@@ -73,9 +74,9 @@ func (p *testPeer) Handshake(head common.Hash, height uint64) error {
 
 func (p *testPeer) RequestHashesFromNumber(from uint64, count uint64) error {
 	time.Sleep(3 * time.Second)
-	last := p.mgr.GetBlockByNumber(from + count - 1)
+	last := p.mgr.Chain.GetBlockByNumber(from + count - 1)
 	if last == nil {
-		bHeader := p.mgr.CurrentBHeader()
+		bHeader := p.mgr.Chain.CurrentBHeader()
 		tempBlock := &xfsgo.Block{Header: bHeader, Transactions: nil, Receipts: nil}
 		last = tempBlock
 		count = last.Height() - from + 1
@@ -91,7 +92,7 @@ func (p *testPeer) RequestHashesFromNumber(from uint64, count uint64) error {
 		return nil
 	}
 	hashes := []common.Hash{last.HeaderHash()}
-	hashes = append(hashes, p.mgr.GetBlockHashesFromHash(last.HeaderHash(), count-1)...)
+	hashes = append(hashes, p.mgr.Chain.GetBlockHashesFromHash(last.HeaderHash(), count-1)...)
 
 	for i := 0; i < len(hashes)/2; i++ {
 		hashes[i], hashes[len(hashes)-1-i] = hashes[len(hashes)-1-i], hashes[i]
@@ -114,7 +115,7 @@ func (p *testPeer) RequestBlocks(hashes RemoteHashes) error {
 	time.Sleep(3 * time.Second)
 	blocks := make(RemoteBlocks, 0)
 	for _, hash := range hashes {
-		block := p.mgr.GetBlockByHashWithoutRec(hash)
+		block := p.mgr.Chain.GetBlockByHashWithoutRec(hash)
 		if block == nil {
 			continue
 		}
@@ -170,8 +171,8 @@ func (p *testPeer) SendData(t uint8, data []byte) error {
 	return nil
 }
 
-func newTestPeer(t *testing.T, mgr chainMgr, id discover.NodeId) *testPeer {
-	last := mgr.CurrentBHeader()
+func newTestPeer(t *testing.T, mgr *core.CoreChain, id discover.NodeId) *testPeer {
+	last := mgr.Chain.CurrentBHeader()
 	return &testPeer{
 		t:            t,
 		mgr:          mgr,

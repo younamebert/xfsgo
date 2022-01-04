@@ -60,6 +60,32 @@ type BlockHeader struct {
 	DposContext *avlmerkle.DposContextProto `json:"dposContext"`
 }
 
+// CopyHeader creates a deep copy of a block header to prevent side effects from
+// modifying a header variable.
+func CopyHeader(h *BlockHeader) *BlockHeader {
+	cpy := *h
+	cpy.Timestamp = h.Timestamp
+	cpy.Difficulty = h.Difficulty
+	cpy.Height = h.Height
+	cpy.GasLimit.Set(h.GasLimit)
+	cpy.GasUsed.Set(h.GasUsed)
+	cpy.Bits = h.Bits
+	cpy.Version = h.Version
+	cpy.Coinbase = h.Coinbase
+
+	if len(h.Extra) > 0 {
+		cpy.Extra = make([]byte, len(h.Extra))
+		copy(cpy.Extra, h.Extra)
+	}
+
+	// add dposContextProto to header
+	cpy.DposContext = &avlmerkle.DposContextProto{}
+	if h.DposContext != nil {
+		cpy.DposContext = h.DposContext
+	}
+	return &cpy
+}
+
 func (bHead *BlockHeader) Number() *big.Int {
 	return new(big.Int).SetUint64(bHead.Height)
 }

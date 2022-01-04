@@ -673,7 +673,7 @@ func (m *Miner) applyTransactions(
 		rec, err := xfsgo.ApplyTransaction(m.chain, nil, mGasPool, stateTree, header, tx, &totalUsedGas, *m.chain.GetVMConfig(), m.current.dposContext)
 		// rec, err := m.chain.ApplyTransaction(stateTree, header, tx, mGasPool, totalUsedGas)
 		if err != nil {
-			if err.Error() == xfsgo.GasPoolOutErr.Error() {
+			if err.Error() == xfsgo.ErrGasPoolOutErr.Error() {
 				//logrus.Errorf("Miner apply transaction err will be ignore: %s", err)
 				ignoreTxs[txfrom] = struct{}{}
 				continue

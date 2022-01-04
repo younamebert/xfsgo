@@ -24,6 +24,7 @@ import (
 	"xfsgo/backend"
 	"xfsgo/log"
 	"xfsgo/node"
+	"xfsgo/params"
 	"xfsgo/storage/badger"
 
 	"github.com/sirupsen/logrus"
@@ -135,8 +136,15 @@ func runDaemon() error {
 		logrus.SetLevel(logrus.DebugLevel)
 		logrus.Debugf("Set debug mode")
 	}
+
+	chainConf := params.DposChainConfig
+	chainConf.Dpos = &params.DposConfig{
+		Validators: config.mChainParams.validates,
+	}
+
 	if back, err = backend.NewBackend(stack, &backend.Config{
 		Params:       backparams,
+		ChainConfig:  chainConf,
 		NodeSyncFlag: config.nodeConfig.NodeSyncFlag,
 		ChainDB:      chainDb,
 		KeysDB:       keysDb,

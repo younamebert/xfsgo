@@ -104,7 +104,7 @@ type IBlockChain interface {
 	SetBoundaries(syncStatsOrigin, syncStatsHeight uint64) error
 	InsertChain(block *Block) error
 	HasBlockAndState(hash common.Hash) bool
-	// ApplyTransactions(stateTree *StateTree, header *BlockHeader, txs []*Transaction) (*big.Int, []*Receipt, error)
+	// ApplyTransactions(stateTree *StateTree, header *BlockHeader, txs []*Transaction) (*big.Int, []*Receipt, error) //
 	// ApplyTransaction(stateTree *StateTree, _ *BlockHeader, tx *Transaction, gp *GasPool, totalGas *big.Int) (*Receipt, error)
 	IntrinsicGas(data []byte) *big.Int
 	GetBlockHashes(from uint64, count uint64) []common.Hash
@@ -116,6 +116,7 @@ type IBlockChain interface {
 	CurrentStateTree() *StateTree
 	GetHeader(hash common.Hash, number uint64) *BlockHeader
 	GetVMConfig() *vm.Config
+	GetEVM(msg Message, statedb *StateTree, header *BlockHeader) (*vm.EVM, error)
 }
 
 // BlockChain represents the canonical chain given a database with a genesis
@@ -170,7 +171,7 @@ func NewBlockChainN(stateDB, chainDB, extraDB badger.IStorage, eventBus *EventBu
 	if err := bc.setLastState(); err != nil {
 		return nil, err
 	}
-	stateRootHash := bc.currentBHeader.GetStateRoot()
+	stateRootHash := bc.currentBHeader.StateRoot
 	bc.stateTree = NewStateTree(stateDB, stateRootHash.Bytes())
 	return bc, nil
 }
@@ -315,7 +316,7 @@ func (bc *BlockChain) CurrentBlock() *Block {
 func (bc *BlockChain) LatestGasLimit() *big.Int {
 	bc.mu.RLock()
 	defer bc.mu.RUnlock()
-	return bc.currentBHeader.GetGasLimit()
+	return bc.currentBHeader.GasLimit
 }
 
 func (bc *BlockChain) LastBlockHash() common.Hash {
@@ -392,7 +393,7 @@ func (bc *BlockChain) writeBlock(block *Block) error {
 		return fmt.Errorf("current chain has no head")
 	}
 
-	if block.Height() > bHeader.HeadHeight() {
+	if block.Height() > bHeader.Height {
 		curHash := bHeader.HeaderHash()
 		bhash := block.HeaderHash()
 		prehash := block.HashPrevBlock()
@@ -402,7 +403,7 @@ func (bc *BlockChain) writeBlock(block *Block) error {
 
 			transactions := bc.GetBlockTransactionsByBHash(bHeader.HeaderHash())
 			receipts := bc.GetBlockReceiptsByBHash(bHeader.HeaderHash())
-			curBlock := &Block{Header: bHeader.GetHead(), Transactions: transactions, Receipts: receipts}
+			curBlock := &Block{Header: bHeader, Transactions: transactions, Receipts: receipts}
 			// fmt.Printf("reorg curblock:%v block:%v\n", curBlock, block)
 			if err := bc.reorg(curBlock, block); err != nil {
 				return err
@@ -910,11 +911,11 @@ func (bc *BlockChain) ApplyTransactions(stateTree *StateTree, block *Block, txs 
 }
 
 func (bc *BlockChain) checkBlockHeaderSanity(prev, header *BlockHeader, blockHash common.Hash) error {
-	target := BitsUnzip(header.GetBits())
+	target := BitsUnzip(header.Bits)
 	if target.Sign() <= 0 {
 		return fmt.Errorf("bits must be a non-negative integer")
 	}
-	max := BitsUnzip(bc.genesisBHeader.GetBits())
+	max := BitsUnzip(bc.genesisBHeader.Bits)
 	//target difficuty should be less than the minimum difficuty based on the genesisBlock
 	if target.Cmp(max) > 0 {
 		return fmt.Errorf("pow check err")
@@ -924,11 +925,11 @@ func (bc *BlockChain) checkBlockHeaderSanity(prev, header *BlockHeader, blockHas
 	if current.Cmp(target) > 0 {
 		return fmt.Errorf("pow check err")
 	}
-	last, err := bc.calcNextRequiredBitsByHeight(prev.HeadHeight())
+	last, err := bc.calcNextRequiredBitsByHeight(prev.Height)
 	if err != nil {
 		return err
 	}
-	if last != header.GetBits() {
+	if last != header.Bits {
 		return fmt.Errorf("pow check err")
 	}
 	return nil
@@ -992,7 +993,7 @@ func TxToAddrNotSet(tx *Transaction) bool {
 
 func (bc *BlockChain) GetBlockHashes(from uint64, count uint64) []common.Hash {
 	bc.mu.Lock()
-	curHeight := bc.currentBHeader.HeadHeight()
+	curHeight := bc.currentBHeader.Height
 	bc.mu.RUnlock()
 	if from+count > curHeight {
 		count = curHeight
@@ -1023,7 +1024,7 @@ func (bc *BlockChain) GetBlockHashesFromHash(hash common.Hash, max uint64) (chai
 }
 func (bc *BlockChain) GetBlocks(from uint64, count uint64) []*Block {
 	bc.mu.RLock()
-	curheight := bc.currentBHeader.HeadHeight()
+	curheight := bc.currentBHeader.Height
 	bc.mu.RUnlock()
 	if from+count > curheight {
 		count = curheight
@@ -1100,7 +1101,7 @@ func (bc *BlockChain) calcNextRequiredBitsByHeight(height uint64) (uint32, error
 	oldTarget := BitsUnzip(lastHeader.Bits)
 	newTarget := new(big.Int).Mul(oldTarget, big.NewInt(adjustedTimespan))
 	newTarget.Div(newTarget, big.NewInt(targetTimespan))
-	newTarget.Set(common.BigMin(newTarget, BitsUnzip(bc.genesisBHeader.GetBits())))
+	newTarget.Set(common.BigMin(newTarget, BitsUnzip(bc.genesisBHeader.Bits)))
 	newTargetBits := BigByZip(newTarget)
 	return newTargetBits, nil
 }
@@ -1109,7 +1110,7 @@ func (bc *BlockChain) CalcNextRequiredDifficulty() (uint32, error) {
 	bc.mu.RLock()
 	lastHeader := bc.currentBHeader
 	bc.mu.RUnlock()
-	return bc.CalcNextRequiredBitsByHeight(lastHeader.HeadHeight())
+	return bc.CalcNextRequiredBitsByHeight(lastHeader.Height)
 }
 
 func (bc *BlockChain) CalcNextRequiredBitsByHeight(height uint64) (uint32, error) {

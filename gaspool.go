@@ -23,7 +23,7 @@ func (gp *GasPool) String() string {
 func (gp *GasPool) SubGas(v *big.Int) error {
 	i := (*big.Int)(gp)
 	if i.Cmp(v) < 0 {
-		return GasPoolOutErr
+		return ErrGasPoolOutErr
 	}
 	i.Sub(i, v)
 	return nil

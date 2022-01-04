@@ -133,7 +133,7 @@ func (o *msgOnceSendTester) GetProtocolMsgCh() (chan p2p.MessageReader, error) {
 	return o.ch, nil
 }
 
-func newTestTxPool(chain chainMgr, gasLimit, gasPrice *big.Int) *xfsgo.TxPool {
+func newTestTxPool(chain *testChainMgr, gasLimit, gasPrice *big.Int) *xfsgo.TxPool {
 	statefn := func() *xfsgo.StateTree {
 		chainhead := chain.CurrentBHeader()
 		return xfsgo.NewStateTree(testMemStorage, chainhead.StateRoot.Bytes())

@@ -36,7 +36,7 @@ type Wallet struct {
 }
 
 // NewWallet constructs and returns a new Wallet instance with badger db.
-func NewWallet(storage *badger.Storage) *Wallet {
+func NewWallet(storage badger.IStorage) *Wallet {
 	w := &Wallet{
 		db:    newKeyStoreDB(storage),
 		cache: make(map[common.Address]*ecdsa.PrivateKey),

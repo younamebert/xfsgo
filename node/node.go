@@ -139,8 +139,8 @@ func (n *Node) RegisterBackend(
 	}
 
 	stateHandler := &api.StateAPIHandler{
-		StateDb:    stateDb,
-		BlockChain: bc,
+		StateDb:   stateDb,
+		CoreChain: bc,
 	}
 
 	netAPIHandler := &api.NetAPIHandler{
@@ -148,9 +148,9 @@ func (n *Node) RegisterBackend(
 	}
 
 	dposApiHandler := &api.DposAPIHandler{
-		Dpos:    dpos,
-		Chain:   bc,
-		ChainDb: chainDb,
+		Dpos:      dpos,
+		CoreChain: bc,
+		ChainDb:   chainDb,
 	}
 
 	if err := n.rpcServer.RegisterName("Chain", chainApiHandler); err != nil {

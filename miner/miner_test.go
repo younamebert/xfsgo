@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 	"xfsgo"
-	"xfsgo/common"
 	"xfsgo/test"
 )
 
@@ -47,23 +46,44 @@ func createMiner(t *testing.T) *Miner {
 
 	extraDb := test.NewMemStorage()
 
+	keyDb := test.NewMemStorage()
+
+	wallet := xfsgo.NewWallet(keyDb)
+
 	event := xfsgo.NewEventBus()
-	if _, err := xfsgo.WriteTestGenesisBlock(test.TestGenesisBits, stateDb, chainDb); err != nil {
+
+	testChainConfig := test.TestChainConfig
+
+	initConf := &xfsgo.GenesisConfig{
+		StateDB: stateDb,
+		ChainDB: chainDb,
+		Debug:   false,
+	}
+	testGenesis := xfsgo.NewGenesis(initConf, testChainConfig, test.TestGenesisBits)
+	if _, err := testGenesis.WriteTestGenesisBlockN(); err != nil {
 		t.Error(err)
 		return nil
 	}
-	bc, err := xfsgo.NewBlockChainN(stateDb, chainDb, extraDb, event, false)
+	bc, err := xfsgo.NewBlockChainN(stateDb, chainDb, extraDb, event, testChainConfig, false)
 	if err != nil {
 		t.Error(err)
 		return nil
 	}
 
+	testCoinbase, err := wallet.AddByRandom()
+	if err != nil {
+		t.Errorf("new wallet account err:%v", err)
+		return nil
+	}
+
 	txPool := xfsgo.NewTxPool(bc.CurrentStateTree, bc.LatestGasLimit, test.TestTxPoolGasPrice, event)
 	config := &Config{
-		Coinbase:   common.Hex2Address(test.TestMinerCoinbase),
+		Coinbase:   testCoinbase,
 		Numworkers: test.TestMinerWorkers,
 	}
 
-	return NewMiner(config, stateDb, bc, event, txPool, test.TestTxPoolGasPrice, test.TestTxPoolGasLimit)
+	// acc
+
+	return NewMiner(config, wallet.All(), stateDb, bc, event, txPool, test.TestTxPoolGasPrice, test.TestTxPoolGasLimit)
 
 }

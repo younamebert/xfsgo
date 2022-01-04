@@ -120,7 +120,7 @@ func TestDposContextDelegateAndUnDelegate(t *testing.T) {
 	delegateIter := dposContext.delegateTrie.NewIterator(candidate.Bytes())
 	delegateIterNext := delegateIter.Next()
 	if delegateIterNext != nil {
-		assert.Equal(t, append(delegatePrefix, append(candidate.Bytes(), delegator.Bytes()...)...), delegateIter.Key)
+		assert.Equal(t, append(delegatePrefix, append(candidate.Bytes(), delegator.Bytes()...)...), delegateIterNext.Key)
 		assert.Equal(t, delegator, common.Bytes2Address(delegateIterNext.Value()))
 	}
 	voteIter := dposContext.voteTrie.NewIterator(nil)

@@ -168,6 +168,11 @@ func (g *Genesis) WriteTestNetGenesisBlockN() (*Block, error) {
 	return g.WriteGenesisBlockN()
 }
 
+func (g *Genesis) WriteTestGenesisBlockN() (*Block, error) {
+	g.Coinbase, g.Balance = "1A2QiH4FYc9c4nsNjCMxygg9HKTK9EJWX5", "10000000"
+	return g.WriteGenesisBlockN()
+}
+
 // func SetupGenesisBlock(db badger.IStorage, genesis *Genesis) (*params.ChainConfig, common.Hash, error) {
 // 	if genesis != nil && genesis.Config == nil {
 // 		return params.DposChainConfig, common.Hash{}, errors.New("genesis has no chain configuration")

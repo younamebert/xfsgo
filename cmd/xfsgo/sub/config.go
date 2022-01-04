@@ -49,6 +49,7 @@ const (
 	defaultLoggerLevel       = "INFO"
 	defaultCliTimeOut        = "180s"
 	defaultNodeSyncFlag      = true
+	defaultValidates         = "YPJKvsirHXXtSvLtLiBHrXAoA69rgkcV2"
 )
 
 var defaultMinGasPrice = common.DefaultGasPrice()
@@ -64,11 +65,16 @@ type storageParams struct {
 	nodesDir string
 }
 
+type chainConfParams struct {
+	validates []common.Address
+}
+
 type loggerParams struct {
 	level string
 }
 
 type daemonConfig struct {
+	mChainParams  *chainConfParams
 	loggerParams  loggerParams
 	storageParams storageParams
 	nodeConfig    node.Config
@@ -149,6 +155,18 @@ func parseConfigStorageParams(v *viper.Viper) storageParams {
 			home, defaultStorageDir)
 	}
 	setupDataDir(&params, params.dataDir)
+	return params
+}
+
+func parseConfigChainParams(v *viper.Viper) *chainConfParams {
+	params := &chainConfParams{}
+	validates := v.GetStringSlice("chain.validates")
+	if len(validates) < 1 {
+		validates = strings.Split(defaultValidates, ",")
+	}
+	for _, addr := range validates {
+		params.validates = append(params.validates, common.B58ToAddress([]byte(addr)))
+	}
 	return params
 }
 
@@ -246,10 +264,12 @@ func parseDaemonConfig(configFilePath string) (daemonConfig, error) {
 	}
 	mStorageParams := parseConfigStorageParams(config)
 	mBackendParams := parseConfigBackendParams(config)
+	mChainParams := parseConfigChainParams(config)
 	mLoggerParams := parseConfigLoggerParams(config)
 	nodeParams := parseConfigNodeParams(config, mBackendParams.NetworkID)
 	nodeParams.NodeDBPath = mStorageParams.nodesDir
 	return daemonConfig{
+		mChainParams:  mChainParams,
 		loggerParams:  mLoggerParams,
 		storageParams: mStorageParams,
 		nodeConfig:    nodeParams,

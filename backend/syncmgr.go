@@ -31,7 +31,7 @@ var (
 	errCancelHashFetch  = errors.New("hash fetching canceled (requested)")
 	errCancelBlockFetch = errors.New("block fetching canceled (requested)")
 	errBusy             = errors.New("busy")
-	warnunsync          = errors.New("warnunsync")
+	errWarnunsync       = errors.New("errWarnunsync")
 	//errEmptyHashSet = errors.New("empty hash set by peer")
 )
 
@@ -46,6 +46,7 @@ type chainMgr interface {
 	InsertChain(block *xfsgo.Block) error
 	SetBoundaries(syncStatsOrigin, syncStatsHeight uint64) error
 }
+
 type hashPack struct {
 	peerId discover.NodeId
 	hashes RemoteHashes
@@ -648,7 +649,7 @@ func (mgr *syncMgr) synchronise(pid discover.NodeId) error {
 	}
 
 	if !mgr.nodeSyncFlag {
-		return warnunsync
+		return errWarnunsync
 	}
 
 	return mgr.syncWithPeer(p)
@@ -668,7 +669,7 @@ func (mgr *syncMgr) Synchronise(p syncpeer) {
 	case nil:
 		logrus.Infof("Synchronisation completed")
 	case errBusy:
-	case warnunsync:
+	case errWarnunsync:
 	default:
 		logrus.Errorf("Synchronisation failed: %v", err)
 	}

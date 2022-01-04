@@ -31,10 +31,10 @@ var (
 )
 
 type keyStoreDB struct {
-	storage *badger.Storage
+	storage badger.IStorage
 }
 
-func newKeyStoreDB(storage *badger.Storage) *keyStoreDB {
+func newKeyStoreDB(storage badger.IStorage) *keyStoreDB {
 	return &keyStoreDB{
 		storage: storage,
 	}

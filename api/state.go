@@ -19,12 +19,13 @@ package api
 import (
 	"xfsgo"
 	"xfsgo/common"
+	"xfsgo/core"
 	"xfsgo/storage/badger"
 )
 
 type StateAPIHandler struct {
-	StateDb    *badger.Storage
-	BlockChain *xfsgo.BlockChain
+	StateDb   *badger.Storage
+	CoreChain *core.CoreChain
 }
 
 type GetAccountArgs struct {
@@ -40,7 +41,7 @@ type GetBalanceArgs struct {
 func (state *StateAPIHandler) GetBalance(args GetBalanceArgs, resp *string) error {
 	var rootHash common.Hash
 	if args.RootHash == "" {
-		rootHash = state.BlockChain.CurrentBHeader().StateRoot
+		rootHash = state.CoreChain.Chain.CurrentBHeader().StateRoot
 	} else {
 		if err := common.HashCalibrator(args.RootHash); err != nil {
 			return xfsgo.NewRPCErrorCause(-32001, err)
@@ -76,7 +77,7 @@ func (state *StateAPIHandler) GetBalance(args GetBalanceArgs, resp *string) erro
 func (state *StateAPIHandler) GetAccount(args GetAccountArgs, resp **StateObjResp) error {
 	var statehash []byte
 	if args.RootHash == "" {
-		rootHash := state.BlockChain.CurrentBHeader().StateRoot
+		rootHash := state.CoreChain.Chain.CurrentBHeader().StateRoot
 		statehash = rootHash[:]
 	} else {
 		if err := common.HashCalibrator(args.RootHash); err != nil {

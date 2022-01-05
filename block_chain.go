@@ -35,13 +35,18 @@ var zeroBigN = new(big.Int).SetInt64(0)
 const (
 	// blocks can be created per second(in seconds)
 	// adjustment factor
-	adjustmentFactor   = int64(2)
-	maxOrphanBlocks    = 100
-	targetTimePerBlock = int64(time.Minute * 3 / time.Second)
-	targetTimespan     = int64(time.Hour * 1 / time.Second)
-	endTimeV2          = int64(time.Hour * 1008 / time.Second)
-	endTimeV3          = int64(time.Hour * 168 / time.Second)
-	totalblocks        = endTimeV2/targetTimePerBlock + endTimeV3/targetTimePerBlock
+	adjustmentFactor    = int64(2)
+	maxOrphanBlocks     = 100
+	targetTimePerBlock  = int64(time.Minute * 3 / time.Second)
+	targetTimespanPreV4 = int64(time.Hour * 1 / time.Second)
+	targetTimespanV4    = int64(time.Minute * 57 / time.Second)
+	endTimeV2           = int64(time.Hour * 1008 / time.Second)
+	endTimeV3           = int64(time.Hour * 168 / time.Second)
+	endTimeV4           = int64(time.Hour * 538 / time.Second)
+	totalblocksv2       = endTimeV2 / targetTimePerBlock
+	totalblocksv3       = endTimeV3 / targetTimePerBlock
+	totalblocksv4       = endTimeV4 / targetTimePerBlock
+	totalblocks         = endTimeV2/targetTimePerBlock + endTimeV3/targetTimePerBlock + endTimeV4/targetTimePerBlock
 	//targetTimePerBlock = int64(time.Minute * 1 / time.Second)
 	//targetTimespan  = int64(time.Minute * 10 / time.Second)
 	//endTimeV1 = int64(time.Minute * 10 / time.Second)
@@ -588,6 +593,7 @@ func calcBlockSubsidy(height uint64) *big.Int {
 // AccumulateRewards calculates the rewards and add it to the miner's account.
 func AccumulateRewards(stateTree *StateTree, header *BlockHeader) {
 	subsidy := calcBlockSubsidy(header.Height)
+
 	//logrus.Debugf("Current height of the blockchain %d, reward: %d", header.Height, subsidy)
 	stateTree.AddBalance(header.Coinbase, subsidy)
 }
@@ -842,11 +848,9 @@ func (bc *BlockChain) checkBlockHeaderSanity(prev, header *BlockHeader, blockHas
 		return fmt.Errorf("pow check err")
 	}
 
-	// v1 blocks 22180
-
-	if header.Height < 22180 {
+	if header.Height <= 22180 {
 		return nil
-	} else if header.Height < uint64(totalblocks) {
+	} else if header.Height < uint64(totalblocksv2+totalblocksv3) {
 		last, err := bc.calcNextRequiredBitsByHeight(prev.Height)
 		if err != nil {
 			return err
@@ -854,6 +858,10 @@ func (bc *BlockChain) checkBlockHeaderSanity(prev, header *BlockHeader, blockHas
 		if last != header.Bits {
 			return fmt.Errorf("pow check err")
 		}
+	} else if header.Height <= 23555 {
+		return nil
+	} else {
+		return fmt.Errorf("pow check err")
 	}
 
 	return nil
@@ -937,59 +945,6 @@ func TxToAddrNotSet(tx *Transaction) bool {
 	return bytes.Equal(tx.To[:], common.ZeroAddr[:])
 }
 
-func (bc *BlockChain) ApplyTransactionN(
-	stateTree *StateTree, _ *BlockHeader,
-	tx *Transaction, gp *GasPool, totalGas *big.Int,
-	ignoreTxs map[common.Address]struct{}) (*Receipt, error) {
-	var (
-		err    error
-		sender *StateObj
-		gas    = new(big.Int).SetInt64(0)
-		status uint32
-	)
-
-	if err = bc.checkTransactionSanity(tx); err != nil {
-		return nil, err
-	}
-	if sender, err = txPreCheck(stateTree, tx, gp, gas); err != nil {
-		return nil, err
-	}
-
-	if err = useGas(gas, common.CalcTxInitialCost(tx.Data)); err != nil {
-		return nil, err
-	}
-	if TxToAddrNotSet(tx) {
-		mVm := vm.NewXVM()
-		if err = mVm.Create(sender.address, tx.Data); err == nil {
-			status = 1
-			sender.SetData()
-		}
-	} else {
-		fromaddr, _ := tx.FromAddr()
-		txhash := tx.Hash()
-		logrus.Debugf("Transfer: from=%s, to=%s, value=%s, txhash=%x", fromaddr.B58String(), tx.To.B58String(), tx.Value, txhash[len(txhash)-4:])
-		if err = bc.transfer(stateTree, sender, tx.To, tx.Value); err != nil {
-			return nil, err
-		}
-		status = 1
-	}
-	stateTree.AddNonce(sender.address, 1)
-
-	// refundGas
-	remaining := new(big.Int).Mul(gas, tx.GasPrice)
-	sender.AddBalance(remaining)
-	gp.AddGas(gas)
-	mgasused := new(big.Int).Sub(tx.GasLimit, gas)
-	stateTree.UpdateAll()
-	totalGas.Add(totalGas, mgasused)
-	receipt := &Receipt{
-		TxHash:  tx.Hash(),
-		Version: tx.Version,
-		Status:  status,
-		GasUsed: mgasused,
-	}
-	return receipt, nil
-}
 func (bc *BlockChain) ApplyTransaction(
 	stateTree *StateTree, _ *BlockHeader,
 	tx *Transaction, gp *GasPool, totalGas *big.Int) (*Receipt, error) {
@@ -1011,10 +966,9 @@ func (bc *BlockChain) ApplyTransaction(
 		return nil, err
 	}
 	if TxToAddrNotSet(tx) {
-		mVm := vm.NewXVM()
+		mVm := vm.NewXVM(stateTree)
 		if err = mVm.Create(sender.address, tx.Data); err == nil {
 			status = 1
-			sender.SetData()
 		}
 	} else {
 		fromaddr, _ := tx.FromAddr()
@@ -1125,9 +1079,6 @@ func (bc *BlockChain) findAncestor(bHeader *BlockHeader, height uint64) *BlockHe
 }
 func (bc *BlockChain) calcNextRequiredBitsByHeight(height uint64) (uint32, error) {
 	if height > 1 && GenesisBits == TestNetGenesisBits {
-		totalblocksv2 := endTimeV2 / targetTimePerBlock
-		totalblocksv3 := endTimeV3 / targetTimePerBlock
-		totalblocks := totalblocksv2 + totalblocksv3
 		//logrus.Infof("total: %d, end: %d, pre: %d, height: %d", totalblocks, endTimeV1, targetTimePerBlock, int64(height))
 		if int64(height) >= totalblocks {
 			return 0, ErrDifficultyOverflow
@@ -1139,16 +1090,30 @@ func (bc *BlockChain) calcNextRequiredBitsByHeight(height uint64) (uint32, error
 	}
 	lastHeader := lastBlock.Header
 	lastHeight := lastBlock.Height()
-	blocksPerRetarget := uint64(targetTimespan / targetTimePerBlock)
+
+	var blocksPerRetarget uint64
+	var targetTimespan int64
+
+	if height < uint64(totalblocksv2+totalblocksv3) {
+		// V3
+		targetTimespan = targetTimespanPreV4
+		blocksPerRetarget = uint64(targetTimespan / targetTimePerBlock)
+	} else if height < uint64(totalblocksv2+totalblocksv3+totalblocksv4) {
+		// V4
+		targetTimespan = targetTimespanV4
+		blocksPerRetarget = uint64(targetTimespan / targetTimePerBlock)
+	}
+
 	// if the height of the next block is not an integral multiple of the target，no changes.
 	if (lastHeight+1)%blocksPerRetarget != 0 {
 		return lastHeader.Bits, nil
 	}
 	first := bc.findAncestor(lastHeader, blocksPerRetarget-1)
 	if first == nil {
+		//logrus.Infof("need bbb")
 		return lastHeader.Bits, nil
 	}
-
+	//logrus.Infof("need aaa")
 	firstTime := first.Timestamp
 	lastTime := lastHeader.Timestamp
 	minRetargetTimespan := targetTimespan / adjustmentFactor

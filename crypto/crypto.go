@@ -132,6 +132,7 @@ func ByteHash256(raw []byte) common.Hash {
 func CreateAddress(addrHash common.Hash, nonce uint64) common.Address {
 	var nonceBytes [8]byte
 	binary.LittleEndian.PutUint64(nonceBytes[:], nonce)
-	h := ahash.SHA256(append(addrHash[:], nonceBytes[:]...))
+	mix := append(addrHash[:], nonceBytes[:]...)
+	h := ahash.SHA256(mix)
 	return common.Bytes2Address(h)
 }

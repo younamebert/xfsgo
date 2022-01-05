@@ -208,6 +208,10 @@ func (so *StateObj) GetStateValue(key [32]byte) []byte {
 	return nil
 }
 
+func (so *StateObj) GetStateRoot() common.Hash {
+	return so.stateRoot
+}
+
 func (so *StateObj) Update() {
 	for k, v := range so.cacheStorage {
 		so.getStateTree().Put(so.makeStateKey(k), v)

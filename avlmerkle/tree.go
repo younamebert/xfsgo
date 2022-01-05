@@ -260,10 +260,12 @@ func (s *Stack) isEmpty() bool {
 // Since there are no parent pointers in the tree currently,
 // a stack is being use to traverse in-order.
 func (t *Tree) NewIterator(prefix []byte) *Iterator {
-	if t.root == nil {
-		return nil
-	}
 	iter := Iterator{stack: &Stack{}}
+	if t.root == nil {
+		iter.currentNode = t.root
+		return &iter
+	}
+
 	cur := t.root
 	for cur.leftNode != nil {
 		if len(prefix) > 0 {

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 	"xfsgo"
+	"xfsgo/consensus/dpos"
 	"xfsgo/test"
 )
 
@@ -75,6 +76,7 @@ func createMiner(t *testing.T) *Miner {
 		t.Errorf("new wallet account err:%v", err)
 		return nil
 	}
+	testChainConfig.Dpos.Validators = append(testChainConfig.Dpos.Validators, testCoinbase)
 
 	txPool := xfsgo.NewTxPool(bc.CurrentStateTree, bc.LatestGasLimit, test.TestTxPoolGasPrice, event)
 	config := &Config{
@@ -82,8 +84,8 @@ func createMiner(t *testing.T) *Miner {
 		Numworkers: test.TestMinerWorkers,
 	}
 
-	// acc
+	testdpos := dpos.New(testChainConfig.Dpos, chainDb)
 
-	return NewMiner(config, wallet.All(), stateDb, bc, event, txPool, test.TestTxPoolGasPrice, test.TestTxPoolGasLimit)
+	return NewMiner(config, wallet.All(), stateDb, bc, event, txPool, test.TestTxPoolGasPrice, test.TestTxPoolGasLimit, testdpos, chainDb)
 
 }

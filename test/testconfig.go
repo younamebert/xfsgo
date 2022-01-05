@@ -3,7 +3,6 @@ package test
 import (
 	"math/big"
 	"xfsgo/common"
-	"xfsgo/consensus/dpos"
 	"xfsgo/params"
 )
 
@@ -26,5 +25,10 @@ var (
 		LondonBlock:         new(big.Int),
 		Dpos:                &params.DposConfig{},
 	}
-	Testdpos = dpos.New(chainConfig.Dpos, config.ChainDB)
+	// TestChainConfig = &params.DposConfig{
+	// 	Validators: common.B58ToAddress([]byte),
+	// }
+	// Testdpos = dpos.New(chainConfig.Dpos, config.ChainDB)
 )
+
+// func Test()

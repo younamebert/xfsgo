@@ -96,6 +96,7 @@ func (ec *EpochContext) kickoutValidator(epoch int64) error {
 			needKickoutValidators = append(needKickoutValidators, &sortableAddress{validator, big.NewInt(cnt)})
 		}
 	}
+
 	// no validators need kickout
 	needKickoutValidatorCnt := len(needKickoutValidators)
 	if needKickoutValidatorCnt <= 0 {
@@ -106,6 +107,7 @@ func (ec *EpochContext) kickoutValidator(epoch int64) error {
 	candidateCount := 0
 
 	iter := ec.DposContext.CandidateTrie().NewIterator(nil)
+
 	for iter.Next() != nil {
 		candidateCount++
 		if candidateCount >= needKickoutValidatorCnt+safeSize {
@@ -116,17 +118,19 @@ func (ec *EpochContext) kickoutValidator(epoch int64) error {
 	for i, validator := range needKickoutValidators {
 		// ensure candidate count greater than or equal to safeSize
 		if candidateCount <= safeSize {
-			logrus.Info("No more candidate can be kickout", "prevEpochID", epoch, "candidateCount", candidateCount, "needKickoutCount", len(needKickoutValidators)-i)
+			logrus.Infof("No more candidate can be kickout prevEpochID:%v candidateCount:%v needKickoutCount:%v", epoch, candidateCount, len(needKickoutValidators)-i)
 			return nil
 		}
 
 		if err := ec.DposContext.KickoutCandidate(validator.address); err != nil {
+			fmt.Println("a4s", err)
 			return err
 		}
 		// if kickout success, candidateCount minus 1
 		candidateCount--
-		logrus.Info("Kickout candidate", "prevEpochID", epoch, "candidate", validator.address.String(), "mintCnt", validator.weight.String())
+		logrus.Infof("Kickout candidate prevEpochID %v candidate %v mintCnt:%v", epoch, validator.address.String(), validator.weight.String())
 	}
+
 	return nil
 }
 
@@ -203,7 +207,7 @@ func (ec *EpochContext) tryElect(genesis, parent *xfsgo.BlockHeader) error {
 		epochTrie, _ := avlmerkle.NewEpochTrie(common.Hash{}, ec.DposContext.DB())
 		ec.DposContext.SetEpoch(epochTrie)
 		ec.DposContext.SetValidators(sortedValidators)
-		logrus.Infof("Come to new epoch prevEpoch %s nextEpoch %s", i, i+1)
+		logrus.Infof("Come to new epoch prevEpoch %v nextEpoch %v", i, i+1)
 	}
 	return nil
 }

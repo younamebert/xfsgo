@@ -21,6 +21,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/x509"
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"reflect"
 	"testing"
@@ -119,15 +120,30 @@ func AddressEq(t *testing.T, got common.Address, want common.Address) {
 	}
 }
 
-func Nil(t *testing.T, err error) {
-	t.Fatalf(err.Error())
+func isNil(object interface{}) bool {
+	if object == nil {
+		return true
+	}
+	value := reflect.ValueOf(object)
+	kind := value.Kind()
+	if kind >= reflect.Chan && kind <= reflect.Slice && value.IsNil() {
+		return true
+	}
+
+	return false
+}
+func Nil(t *testing.T, err error) bool {
+	if isNil(err) {
+		return true
+	}
+	fmt.Println(err)
+	t.Error(err)
+	return false
 }
 
 // func NotNil
 func HashEqual(t *testing.T, got, want common.Hash) {
-	if bytes.Compare(got.Bytes(), want.Bytes()) != common.Zero {
-		t.Fatalf("got: %x want: %x\n", got, want)
-	}
+	t.Logf("got equal want type hash resulte:%v", common.BytesEquals(got.Bytes(), want.Bytes()))
 }
 
 func BytesEqual(t *testing.T, got, want []byte) {

@@ -236,11 +236,11 @@ func (p *DposContextProto) Root() common.Hash {
 func (d *DposContext) KickoutCandidate(candidateAddr common.Address) error {
 	candidate := candidateAddr.Bytes()
 	// d.candidateTrie.
+
 	err := d.candidateTrie.Remove(candidate)
 	if err != nil {
 		return err
 	}
-
 	iter := d.delegateTrie.NewIterator(candidate)
 	iterNext := iter.Next()
 	for iterNext != nil {

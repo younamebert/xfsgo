@@ -80,7 +80,7 @@ var (
 
 type Dpos struct {
 	config *params.DposConfig // Consensus engine configuration parameters
-	db     *badger.Storage    // Database to store and retrieve snapshot checkpoints
+	db     badger.IStorage    // Database to store and retrieve snapshot checkpoints
 
 	signer               common.Address
 	signFn               SignerFn
@@ -101,7 +101,7 @@ func sigHash(header *xfsgo.BlockHeader) common.Hash {
 	return common.Bytes2Hash(info)
 }
 
-func New(config *params.DposConfig, db *badger.Storage) *Dpos {
+func New(config *params.DposConfig, db badger.IStorage) *Dpos {
 	signatures := lru.NewCache(inmemorySignatures)
 
 	return &Dpos{

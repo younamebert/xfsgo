@@ -243,8 +243,8 @@ func (ethash *Ethash) verifyHeader(chain *xfsgo.BlockChain, header, parent *xfsg
 
 	limit := new(big.Int).Set(parent.GasLimit)
 	// limit = limit.Div(limit, common.GasLimitBoundDivisor)
-
-	if diff.Cmp(limit) >= 0 || header.GasLimit.Cmp(params.MinGasLimit) < 0 {
+	MinGasLimit := new(big.Int).SetUint64(params.MinGasLimit)
+	if diff.Cmp(limit) >= 0 || header.GasLimit.Cmp(MinGasLimit) < 0 {
 		return fmt.Errorf("invalid gas limit: have %v, want %v += %v", header.GasLimit, parent.GasLimit, limit)
 	}
 	// Verify that the block number is parent's +1

@@ -49,7 +49,7 @@ const (
 	defaultLoggerLevel       = "INFO"
 	defaultCliTimeOut        = "180s"
 	defaultNodeSyncFlag      = true
-	defaultValidates         = "YPJKvsirHXXtSvLtLiBHrXAoA69rgkcV2"
+	defaultValidates         = "iPh44dDVBz77tjAfKGxHA3NjZjh43wAkU"
 )
 
 var defaultMinGasPrice = common.DefaultGasPrice()

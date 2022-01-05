@@ -35,13 +35,18 @@ var zeroBigN = new(big.Int).SetInt64(0)
 const (
 	// blocks can be created per second(in seconds)
 	// adjustment factor
-	adjustmentFactor   = int64(2)
-	maxOrphanBlocks    = 100
-	targetTimePerBlock = int64(time.Minute * 3 / time.Second)
-	targetTimespan     = int64(time.Hour * 1 / time.Second)
-	endTimeV2          = int64(time.Hour * 1008 / time.Second)
-	endTimeV3          = int64(time.Hour * 168 / time.Second)
-	totalblocks        = endTimeV2/targetTimePerBlock + endTimeV3/targetTimePerBlock
+	adjustmentFactor    = int64(2)
+	maxOrphanBlocks     = 100
+	targetTimePerBlock  = int64(time.Minute * 3 / time.Second)
+	targetTimespanPreV4 = int64(time.Hour * 1 / time.Second)
+	targetTimespanV4    = int64(time.Minute * 57 / time.Second)
+	endTimeV2           = int64(time.Hour * 1008 / time.Second)
+	endTimeV3           = int64(time.Hour * 168 / time.Second)
+	endTimeV4           = int64(time.Hour * 538 / time.Second)
+	totalblocksv2       = endTimeV2 / targetTimePerBlock
+	totalblocksv3       = endTimeV3 / targetTimePerBlock
+	totalblocksv4       = endTimeV4 / targetTimePerBlock
+	totalblocks         = endTimeV2/targetTimePerBlock + endTimeV3/targetTimePerBlock + endTimeV4/targetTimePerBlock
 	//targetTimePerBlock = int64(time.Minute * 1 / time.Second)
 	//targetTimespan  = int64(time.Minute * 10 / time.Second)
 	//endTimeV1 = int64(time.Minute * 10 / time.Second)
@@ -588,6 +593,7 @@ func calcBlockSubsidy(height uint64) *big.Int {
 // AccumulateRewards calculates the rewards and add it to the miner's account.
 func AccumulateRewards(stateTree *StateTree, header *BlockHeader) {
 	subsidy := calcBlockSubsidy(header.Height)
+
 	//logrus.Debugf("Current height of the blockchain %d, reward: %d", header.Height, subsidy)
 	stateTree.AddBalance(header.Coinbase, subsidy)
 }
@@ -842,11 +848,9 @@ func (bc *BlockChain) checkBlockHeaderSanity(prev, header *BlockHeader, blockHas
 		return fmt.Errorf("pow check err")
 	}
 
-	// v1 blocks 22180
-
-	if header.Height < 22180 {
+	if header.Height <= 22180 {
 		return nil
-	} else if header.Height < uint64(totalblocks) {
+	} else if header.Height < uint64(totalblocksv2+totalblocksv3) {
 		last, err := bc.calcNextRequiredBitsByHeight(prev.Height)
 		if err != nil {
 			return err
@@ -854,6 +858,10 @@ func (bc *BlockChain) checkBlockHeaderSanity(prev, header *BlockHeader, blockHas
 		if last != header.Bits {
 			return fmt.Errorf("pow check err")
 		}
+	} else if header.Height <= 23555 {
+		return nil
+	} else {
+		return fmt.Errorf("pow check err")
 	}
 
 	return nil
@@ -1071,9 +1079,6 @@ func (bc *BlockChain) findAncestor(bHeader *BlockHeader, height uint64) *BlockHe
 }
 func (bc *BlockChain) calcNextRequiredBitsByHeight(height uint64) (uint32, error) {
 	if height > 1 && GenesisBits == TestNetGenesisBits {
-		totalblocksv2 := endTimeV2 / targetTimePerBlock
-		totalblocksv3 := endTimeV3 / targetTimePerBlock
-		totalblocks := totalblocksv2 + totalblocksv3
 		//logrus.Infof("total: %d, end: %d, pre: %d, height: %d", totalblocks, endTimeV1, targetTimePerBlock, int64(height))
 		if int64(height) >= totalblocks {
 			return 0, ErrDifficultyOverflow
@@ -1085,7 +1090,20 @@ func (bc *BlockChain) calcNextRequiredBitsByHeight(height uint64) (uint32, error
 	}
 	lastHeader := lastBlock.Header
 	lastHeight := lastBlock.Height()
-	blocksPerRetarget := uint64(targetTimespan / targetTimePerBlock)
+
+	var blocksPerRetarget uint64
+	var targetTimespan int64
+
+	if height < uint64(totalblocksv2+totalblocksv3) {
+		// V3
+		targetTimespan = targetTimespanPreV4
+		blocksPerRetarget = uint64(targetTimespan / targetTimePerBlock)
+	} else if height < uint64(totalblocksv2+totalblocksv3+totalblocksv4) {
+		// V4
+		targetTimespan = targetTimespanV4
+		blocksPerRetarget = uint64(targetTimespan / targetTimePerBlock)
+	}
+
 	// if the height of the next block is not an integral multiple of the target，no changes.
 	if (lastHeight+1)%blocksPerRetarget != 0 {
 		return lastHeader.Bits, nil

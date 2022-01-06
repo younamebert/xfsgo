@@ -860,6 +860,14 @@ func (bc *BlockChain) checkBlockHeaderSanity(prev, header *BlockHeader, blockHas
 		}
 	} else if header.Height <= 23555 {
 		return nil
+	} else if header.Height <= uint64(totalblocks) {
+		last, err := bc.calcNextRequiredBitsByHeight(prev.Height)
+		if err != nil {
+			return err
+		}
+		if last != header.Bits {
+			return fmt.Errorf("pow check err")
+		}
 	} else {
 		return fmt.Errorf("pow check err")
 	}
@@ -945,59 +953,6 @@ func TxToAddrNotSet(tx *Transaction) bool {
 	return bytes.Equal(tx.To[:], common.ZeroAddr[:])
 }
 
-func (bc *BlockChain) ApplyTransactionN(
-	stateTree *StateTree, _ *BlockHeader,
-	tx *Transaction, gp *GasPool, totalGas *big.Int,
-	ignoreTxs map[common.Address]struct{}) (*Receipt, error) {
-	var (
-		err    error
-		sender *StateObj
-		gas    = new(big.Int).SetInt64(0)
-		status uint32
-	)
-
-	if err = bc.checkTransactionSanity(tx); err != nil {
-		return nil, err
-	}
-	if sender, err = txPreCheck(stateTree, tx, gp, gas); err != nil {
-		return nil, err
-	}
-
-	if err = useGas(gas, common.CalcTxInitialCost(tx.Data)); err != nil {
-		return nil, err
-	}
-	if TxToAddrNotSet(tx) {
-		mVm := vm.NewXVM()
-		if err = mVm.Create(sender.address, tx.Data); err == nil {
-			status = 1
-			sender.SetData()
-		}
-	} else {
-		fromaddr, _ := tx.FromAddr()
-		txhash := tx.Hash()
-		logrus.Debugf("Transfer: from=%s, to=%s, value=%s, txhash=%x", fromaddr.B58String(), tx.To.B58String(), tx.Value, txhash[len(txhash)-4:])
-		if err = bc.transfer(stateTree, sender, tx.To, tx.Value); err != nil {
-			return nil, err
-		}
-		status = 1
-	}
-	stateTree.AddNonce(sender.address, 1)
-
-	// refundGas
-	remaining := new(big.Int).Mul(gas, tx.GasPrice)
-	sender.AddBalance(remaining)
-	gp.AddGas(gas)
-	mgasused := new(big.Int).Sub(tx.GasLimit, gas)
-	stateTree.UpdateAll()
-	totalGas.Add(totalGas, mgasused)
-	receipt := &Receipt{
-		TxHash:  tx.Hash(),
-		Version: tx.Version,
-		Status:  status,
-		GasUsed: mgasused,
-	}
-	return receipt, nil
-}
 func (bc *BlockChain) ApplyTransaction(
 	stateTree *StateTree, _ *BlockHeader,
 	tx *Transaction, gp *GasPool, totalGas *big.Int) (*Receipt, error) {
@@ -1019,10 +974,9 @@ func (bc *BlockChain) ApplyTransaction(
 		return nil, err
 	}
 	if TxToAddrNotSet(tx) {
-		mVm := vm.NewXVM()
+		mVm := vm.NewXVM(stateTree)
 		if err = mVm.Create(sender.address, tx.Data); err == nil {
 			status = 1
-			sender.SetData()
 		}
 	} else {
 		fromaddr, _ := tx.FromAddr()
@@ -1164,9 +1118,10 @@ func (bc *BlockChain) calcNextRequiredBitsByHeight(height uint64) (uint32, error
 	}
 	first := bc.findAncestor(lastHeader, blocksPerRetarget-1)
 	if first == nil {
+		//logrus.Infof("need bbb")
 		return lastHeader.Bits, nil
 	}
-
+	//logrus.Infof("need aaa")
 	firstTime := first.Timestamp
 	lastTime := lastHeader.Timestamp
 	minRetargetTimespan := targetTimespan / adjustmentFactor

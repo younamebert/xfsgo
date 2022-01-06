@@ -19,7 +19,6 @@ package xfsgo
 import (
 	"bytes"
 	"encoding/hex"
-	"io"
 	"math/big"
 	"xfsgo/avlmerkle"
 	"xfsgo/common"
@@ -34,14 +33,27 @@ import (
 // Second, access and modify the balance of account through the object.
 // Finally, call Commit method to write the modified merkleTree into a database.
 type StateObj struct {
-	merkleTree *avlmerkle.Tree
-	address    common.Address //hash of address of the account
-	balance    *big.Int
-	nonce      uint64
-	extra      []byte
-	buffer     *bytes.Buffer
+	merkleTree   *avlmerkle.Tree
+	address      common.Address //hash of address of the account
+	balance      *big.Int
+	nonce        uint64
+	extra        []byte
+	code         []byte
+	stateRoot    common.Hash
+	cacheStorage map[[32]byte][]byte
+	db           badger.IStorage
 }
 
+func loadBytesByMapKey(m map[string]string, key string) (data []byte, rt bool) {
+	var str string
+	var err error
+	if str, rt = m[key]; rt {
+		if data, err = hex.DecodeString(str); err != nil {
+			rt = false
+		}
+	}
+	return
+}
 func (so *StateObj) Decode(data []byte) error {
 	r := common.StringDecodeMap(string(data))
 	if r == nil {
@@ -62,10 +74,14 @@ func (so *StateObj) Decode(data []byte) error {
 			so.nonce = num.Uint64()
 		}
 	}
-	if extra, ok := r["extra"]; ok {
-		if bs, err := hex.DecodeString(extra); err == nil {
-			so.extra = bs
-		}
+	if bs, ok := loadBytesByMapKey(r, "extra"); ok {
+		so.extra = bs
+	}
+	if bs, ok := loadBytesByMapKey(r, "code"); ok {
+		so.code = bs
+	}
+	if bs, ok := loadBytesByMapKey(r, "state_root"); ok {
+		so.stateRoot = common.Bytes2Hash(bs)
 	}
 	return nil
 }
@@ -77,15 +93,32 @@ func (so *StateObj) Encode() ([]byte, error) {
 		"nonce":   new(big.Int).SetUint64(so.nonce).Text(10),
 		"extra":   hex.EncodeToString(so.extra),
 	}
+	if so.code != nil {
+		objmap["code"] = hex.EncodeToString(so.code)
+	}
+	if !bytes.Equal(so.stateRoot[:], common.HashZ[:]) {
+		objmap["state_root"] = hex.EncodeToString(so.stateRoot[:])
+	}
 	enc := common.SortAndEncodeMap(objmap)
 	return []byte(enc), nil
 }
 
 // NewStateObj creates an StateObj with accout address and tree
-func NewStateObj(address common.Address, tree *avlmerkle.Tree) *StateObj {
+//func NewStateObj(address common.Address, tree *avlmerkle.Tree) *StateObj {
+//	obj := &StateObj{
+//		address:      address,
+//		merkleTree:   tree,
+//		cacheStorage: make(map[[32]byte][]byte),
+//	}
+//	return obj
+//}
+
+func NewStateObj(address common.Address, tree *avlmerkle.Tree, db badger.IStorage) *StateObj {
 	obj := &StateObj{
-		address:    address,
-		merkleTree: tree,
+		address:      address,
+		merkleTree:   tree,
+		db:           db,
+		cacheStorage: make(map[[32]byte][]byte),
 	}
 	return obj
 }
@@ -145,38 +178,50 @@ func (so *StateObj) SubNonce(nonce uint64) {
 func (so *StateObj) GetNonce() uint64 {
 	return so.nonce
 }
+func (so *StateObj) GetExtra() []byte {
+	return so.extra
+}
+
+func (so *StateObj) SetCode(code []byte) {
+	so.code = code
+}
+func (so *StateObj) SetState(key [32]byte, value []byte) {
+	so.cacheStorage[key] = value
+}
+func (so *StateObj) GetCode() []byte {
+	return so.code
+}
+func (so *StateObj) makeStateKey(key [32]byte) []byte {
+	return ahash.SHA256(append(so.address[:], key[:]...))
+}
+func (so *StateObj) getStateTree() *avlmerkle.Tree {
+	return avlmerkle.NewTree(so.db, so.stateRoot[:])
+}
+
+func (so *StateObj) GetStateValue(key [32]byte) []byte {
+	if val, exists := so.cacheStorage[key]; exists {
+		return val
+	}
+	if val, ok := so.getStateTree().Get(so.makeStateKey(key)); ok {
+		return val
+	}
+	return nil
+}
+
+func (so *StateObj) GetStateRoot() common.Hash {
+	return so.stateRoot
+}
 
 func (so *StateObj) Update() {
+	for k, v := range so.cacheStorage {
+		so.getStateTree().Put(so.makeStateKey(k), v)
+	}
+	stateRoot := so.getStateTree().Checksum()
+	so.stateRoot = common.Bytes2Hash(stateRoot)
 	objRaw, _ := rawencode.Encode(so)
 	hash := ahash.SHA256(so.address[:])
 	so.merkleTree.Put(hash, objRaw)
-}
 
-func (so *StateObj) WriteData(data []byte) (int, error) {
-	if so.buffer == nil {
-		so.buffer = bytes.NewBuffer(nil)
-	}
-	n, err := io.Copy(so.buffer, bytes.NewReader(data))
-	if err != nil {
-		return int(n), err
-	}
-	return int(n), err
-}
-
-func (so *StateObj) ReadData(dst []byte) (int, error) {
-	if so.buffer == nil {
-		so.buffer = bytes.NewBuffer(so.extra)
-	}
-	return so.buffer.Read(dst)
-}
-func (so *StateObj) SetData() {
-	if so.buffer == nil {
-		return
-	}
-	so.extra = so.buffer.Bytes()
-}
-func (so *StateObj) GetData() []byte {
-	return so.extra
 }
 
 type StateTree struct {
@@ -278,7 +323,7 @@ func (st *StateTree) GetStateObj(addr common.Address) *StateObj {
 }
 
 func (st *StateTree) newStateObj(address common.Address) *StateObj {
-	obj := NewStateObj(address, st.merkleTree)
+	obj := NewStateObj(address, st.merkleTree, st.treeDB)
 	st.objs[obj.address] = obj
 	return obj
 }
@@ -298,7 +343,33 @@ func (st *StateTree) GetOrNewStateObj(addr common.Address) *StateObj {
 	}
 	return stateObj
 }
+func (st *StateTree) SetState(addr common.Address, key [32]byte, value []byte) {
+	obj := st.GetOrNewStateObj(addr)
+	if obj != nil {
+		obj.SetState(key, value)
+	}
+}
+func (st *StateTree) SetCode(addr common.Address, code []byte) {
+	obj := st.GetOrNewStateObj(addr)
+	if obj != nil {
+		obj.SetCode(code)
+	}
+}
+func (st *StateTree) GetCode(addr common.Address) []byte {
+	obj := st.GetOrNewStateObj(addr)
+	if obj != nil {
+		return obj.GetCode()
+	}
+	return nil
+}
 
+func (st *StateTree) GetStateValue(addr common.Address, key [32]byte) []byte {
+	obj := st.GetOrNewStateObj(addr)
+	if obj != nil {
+		return obj.GetStateValue(key)
+	}
+	return nil
+}
 func (st *StateTree) Root() []byte {
 	return st.merkleTree.Checksum()
 }

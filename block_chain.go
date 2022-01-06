@@ -860,6 +860,14 @@ func (bc *BlockChain) checkBlockHeaderSanity(prev, header *BlockHeader, blockHas
 		}
 	} else if header.Height <= 23555 {
 		return nil
+	} else if header.Height <= uint64(totalblocks) {
+		last, err := bc.calcNextRequiredBitsByHeight(prev.Height)
+		if err != nil {
+			return err
+		}
+		if last != header.Bits {
+			return fmt.Errorf("pow check err")
+		}
 	} else {
 		return fmt.Errorf("pow check err")
 	}

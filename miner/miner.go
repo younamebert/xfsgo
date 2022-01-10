@@ -488,6 +488,7 @@ func (m *Miner) createNewWork() (*Work, error) {
 	header.StateRoot = stateRootHash
 	// Create the new block to seal with the consensus engine
 	block, err := m.engine.Finalize(m.chain, header, stateTree, committx, work.receipts, work.dposContext)
+
 	if err != nil {
 		return nil, fmt.Errorf("got error when finalize block for sealing, err: %s", err)
 	}

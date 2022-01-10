@@ -243,10 +243,10 @@ func (d *Dpos) verifyBlockSigner(validator common.Address, header *xfsgo.BlockHe
 	if err != nil {
 		return err
 	}
-	if bytes.Compare(signer.Bytes(), validator.Bytes()) != int(0) {
+	if bytes.Compare(signer.Bytes(), validator.Bytes()) != 0 {
 		return ErrInvalidBlockValidator
 	}
-	if bytes.Compare(signer.Bytes(), header.Validator.Bytes()) != int(0) {
+	if bytes.Compare(signer.Bytes(), header.Validator.Bytes()) != 0 {
 		return ErrMismatchSignerAndValidator
 	}
 	return nil

@@ -37,6 +37,15 @@ func BaseCoin2Atto(coin string) (*big.Int, error) {
 	i, _ := attocoin.Int(nil)
 	return i, nil
 }
+func BaseCoin2AttoN(coin string) *big.Int {
+	bigCoin, ok := new(big.Float).SetString(coin)
+	if !ok {
+		return nil
+	}
+	attocoin := bigCoin.Mul(bigCoin, big.NewFloat(float64(AttoCoin)))
+	i, _ := attocoin.Int(nil)
+	return i
+}
 
 // min coin
 func Atto2BaseCoin(atto *big.Int) *big.Int {

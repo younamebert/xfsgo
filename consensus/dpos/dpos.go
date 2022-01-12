@@ -43,8 +43,8 @@ var (
 	// big8  = big.NewInt(8)
 	// big32 = big.NewInt(32)
 
-	frontierBlockReward  = common.NanoCoin2Atto(big.NewInt(50)) // Block reward in wei for successfully mining a block
-	byzantiumBlockReward = common.NanoCoin2Atto(big.NewInt(30)) // Block reward in wei for successfully mining a block upward from Byzantium
+	frontierBlockReward  = common.BaseCoin2AttoN("50") // Block reward in wei for successfully mining a block
+	byzantiumBlockReward = common.BaseCoin2AttoN("30") // Block reward in wei for successfully mining a block upward from Byzantium
 
 	timeOfFirstBlock = int64(0)
 
@@ -347,18 +347,25 @@ func (d *Dpos) Prepare(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader) error
 
 func AccumulateRewards(config *params.ChainConfig, state *xfsgo.StateTree, header *xfsgo.BlockHeader) {
 	// Select the correct block reward based on chain progression
-	reward := new(big.Int).Set(frontierBlockReward)
+	blockReward := frontierBlockReward
 	if config.IsByzantium(header.Number()) {
-		reward.Set(byzantiumBlockReward)
+		blockReward = byzantiumBlockReward
 	}
 	// Accumulate the rewards for the miner and any included uncles
-	blockreward := new(big.Int).Set(reward)
-	state.AddBalance(header.Coinbase, blockreward)
+	reward := new(big.Int).Set(blockReward)
+	state.AddBalance(header.Coinbase, reward)
 }
 
 func (d *Dpos) Finalize(chain xfsgo.IBlockChain, header *xfsgo.BlockHeader, state *xfsgo.StateTree, txs []*xfsgo.Transaction, receipts []*xfsgo.Receipt, dposContext *avlmerkle.DposContext) (*xfsgo.Block, error) {
 	// Accumulate block rewards and commit the final state root
+
 	AccumulateRewards(chain.Config(), state, header)
+
+	state.UpdateAll()
+	stateRootBytes := state.Root()
+	stateRootHash := common.Bytes2Hash(stateRootBytes)
+
+	header.StateRoot = stateRootHash
 
 	number := common.BigSubN(header.Height, 1)
 	parent := chain.GetBlockByNumber(number.Uint64()).GetHeader()

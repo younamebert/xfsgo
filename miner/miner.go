@@ -131,7 +131,7 @@ type Miner struct {
 
 func NewMiner(config *Config,
 	accounts map[common.Address]*ecdsa.PrivateKey,
-	stateDb badger.IStorage,
+	stateDb *badger.Storage,
 	chain xfsgo.IBlockChain,
 	eventBus *xfsgo.EventBus,
 	pool *xfsgo.TxPool,
@@ -318,10 +318,17 @@ func (m *Miner) waitworker() {
 				continue
 			}
 			block := result.Block
+
 			// work := result.Work
 
-			err := m.chain.WriteBlock(block)
-			if err != nil {
+			// addr := block.Coinbase()
+			// keyhash := ahash.SHA256(addr.Bytes())
+			// m.stateDb.Foreach(func(k string, v []byte) error {
+			// 	fmt.Printf("key:%v v:%v\n", k, string(v))
+			// 	return nil
+			// })
+
+			if err := m.chain.WriteBlock(block); err != nil {
 				logrus.Errorf("Failed writing block to chain err:%v", err)
 				continue
 			}
@@ -339,12 +346,6 @@ func (m *Miner) waitworker() {
 			logrus.Infof("Successfully sealed new block number:%s hash:%s\n", block.Header.Number(), bcHash.Hex())
 		}
 	}
-}
-
-func (m *Miner) getStateTree() *xfsgo.StateTree {
-	lastBlock := m.chain.CurrentBHeader()
-	lastStateRoot := lastBlock.StateRoot
-	return xfsgo.NewStateTree(m.stateDb, lastStateRoot.Bytes())
 }
 
 func (m *Miner) updateWorker() {
@@ -368,7 +369,11 @@ func (m *Miner) updateWorker() {
 
 			txs := m.pool.GetTransactions()
 
-			stateTree := m.getStateTree()
+			lastBlock := m.chain.CurrentBHeader()
+			lastStateRoot := lastBlock.StateRoot
+			//lastBlockHash := lastBlock.Hash()
+			//logrus.Debugf("Generating block by parent height=%d, hash=0x%x...%x, workerId=%-3d", lastBlock.Height(), lastBlockHash[:4], lastBlockHash[len(lastBlockHash)-4:], num)
+			stateTree := xfsgo.NewStateTree(m.stateDb, lastStateRoot.Bytes())
 
 			committx := make([]*xfsgo.Transaction, 0)
 			ignoretxs := make(map[common.Address]struct{})
@@ -435,6 +440,7 @@ func (m *Miner) createNewWork() (*Work, error) {
 	if parent.Time().Cmp(new(big.Int).SetInt64(tstamp)) >= 0 {
 		tstamp = parent.Time().Int64() + 1
 	}
+	// m.stateDb.GetData()
 	// this will ensure we're not going off too far in the future
 	if now := time.Now().Unix(); tstamp > now+1 {
 		wait := time.Duration(tstamp-now) * time.Second
@@ -455,9 +461,6 @@ func (m *Miner) createNewWork() (*Work, error) {
 	if err := m.engine.Prepare(m.chain, header); err != nil {
 		return nil, fmt.Errorf("got error when preparing header, err: %s", err)
 	}
-	lastBlock := m.chain.CurrentBHeader()
-	lastStateRoot := lastBlock.StateRoot
-	stateTree := xfsgo.NewStateTree(m.stateDb, lastStateRoot.Bytes())
 
 	// Could potentially happen if starting to mine in an odd state.
 	err := m.makeCurrent(parent, header)
@@ -471,6 +474,14 @@ func (m *Miner) createNewWork() (*Work, error) {
 
 	xfsgo.SortByPriceAndNonce(pending)
 
+	lastBlock := m.chain.CurrentBHeader()
+	lastStateRoot := lastBlock.StateRoot
+	//lastBlockHash := lastBlock.Hash()
+	//logrus.Debugf("Generating block by parent height=%d, hash=0x%x...%x, workerId=%-3d", lastBlock.Height(), lastBlockHash[:4], lastBlockHash[len(lastBlockHash)-4:], num)
+	stateTree := xfsgo.NewStateTree(m.stateDb, lastStateRoot.Bytes())
+
+	logrus.Debugf("minerbal:%v coinbase:%v\n", stateTree.GetBalance(header.Coinbase).String(), header.Coinbase.B58String())
+
 	committx := make([]*xfsgo.Transaction, 0)
 	ignoretxs := make(map[common.Address]struct{})
 	gasused, res, err := m.applyTransactions(
@@ -481,17 +492,13 @@ func (m *Miner) createNewWork() (*Work, error) {
 
 	header.GasUsed.Set(gasused)
 
-	// dpos.AccumulateRewards(m.chain.Config(), stateTree, header)
-	stateRootBytes := stateTree.Root()
-	stateRootHash := common.Bytes2Hash(stateRootBytes)
-
-	header.StateRoot = stateRootHash
 	// Create the new block to seal with the consensus engine
 	block, err := m.engine.Finalize(m.chain, header, stateTree, committx, work.receipts, work.dposContext)
 
 	if err != nil {
 		return nil, fmt.Errorf("got error when finalize block for sealing, err: %s", err)
 	}
+
 	stateTree.UpdateAll()
 	work.Block = block
 	work.receipts = append(work.receipts, res...)
@@ -504,7 +511,6 @@ func (m *Miner) createNewWork() (*Work, error) {
 		return nil, err
 	}
 	return work, nil
-
 }
 
 // makeCurrent creates a new environment for the current cycle.

@@ -16,8 +16,8 @@ import (
 
 // Ethash proof-of-work protocol constants.
 var (
-	frontierBlockReward  *big.Int = big.NewInt(5e+18)
-	byzantiumBlockReward *big.Int = big.NewInt(3e+18)
+	frontierBlockReward  = common.BaseCoin2AttoN("50") // Block reward in wei for successfully mining a block
+	byzantiumBlockReward = common.BaseCoin2AttoN("30") // Block reward in wei for successfully mining a block upward from Byzantium
 	// maxUncles                     = 2                 // Maximum number of uncles allowed in a single block
 )
 
@@ -487,16 +487,20 @@ func (ethash *Ethash) Finalize(chain *xfsgo.BlockChain, header *xfsgo.BlockHeade
 	// Accumulate any block and uncle rewards and commit the final state root
 	AccumulateRewards(chain.Config(), state, header)
 	// header. = state.IntermediateRoot(chain.Config().IsEIP158(header.Number()))
+	state.UpdateAll()
+	stateRootBytes := state.Root()
+	stateRootHash := common.Bytes2Hash(stateRootBytes)
 
+	header.StateRoot = stateRootHash
 	// Header seems complete, assemble into a block and return
 	return xfsgo.NewBlock(header, txs, receipts), nil
 }
 
 // Some weird constants to avoid constant memory allocs for them.
-var (
-	big8  = big.NewInt(8)
-	big32 = big.NewInt(32)
-)
+// var (
+// 	big8  = big.NewInt(8)
+// 	big32 = big.NewInt(32)
+// )
 
 func AccumulateRewards(config *params.ChainConfig, state *xfsgo.StateTree, header *xfsgo.BlockHeader) {
 	// Select the correct block reward based on chain progression

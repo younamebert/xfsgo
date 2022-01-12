@@ -292,21 +292,18 @@ func (t *Tree) Commit() error {
 	err := t.root.dfsCall(t, func(node *TreeNode) error {
 		root := t.Checksum()
 		_ = root
-
 		key := append([]byte("tree:"), node.id...)
 
 		bs, err := rawencode.Encode(node)
 		if err != nil {
 			return err
 		}
-
+		// return batch.Put(append([]byte("tree:"), node.id...), bs)
 		if len(root) == 0 || len(key) == 0 || len(bs) == 0 {
 			return errors.New("root or key or bs not null")
 		}
-		err = batch.Put(key, bs)
-		return err
+		return batch.Put(key, bs)
 	})
-
 	if err != nil {
 		return err
 	}

@@ -331,9 +331,9 @@ func applyDposMessage(tx *Transaction, dposContext *avlmerkle.DposContext) error
 	case LogoutCandidate:
 		dposContext.KickoutCandidate(tx.From())
 	case Delegate:
-		dposContext.Delegate(tx.From(), *(&tx.To))
+		dposContext.Delegate(tx.From(), tx.To)
 	case UnDelegate:
-		dposContext.UnDelegate(tx.From(), *(&tx.To))
+		dposContext.UnDelegate(tx.From(), tx.To)
 	default:
 		return errors.New("invalid transaction type")
 	}

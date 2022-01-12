@@ -21,4 +21,6 @@ target/
 *.log
 *.yml
 !.golangci.yml
+!config-development.yml
+!genesis-development.json
 .vscode/

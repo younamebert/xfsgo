@@ -113,7 +113,7 @@ func TestXvm_Create(t *testing.T) {
 	vm := NewXVM(st)
 	inputBuf := bytes.NewBuffer(nil)
 	inputBuf.Write(tokenCode)
-	inputBuf.Write(tokenCreateFnHash)
+	inputBuf.Write(common.ZeroHash[:])
 	inputBuf.Write(testAbTokenCreateParams)
 	addr := common.Address{0x01}
 	simpleCode := []byte("hello, world")

@@ -140,7 +140,15 @@ func (n *Node) RegisterBackend(
 	netAPIHandler := &api.NetAPIHandler{
 		NetServer: n.P2PServer(),
 	}
-
+	tokenAPIHandler := &api.TokenApiHandler{
+		BlockChain:    bc,
+		TxPendingPool: txPool,
+		Wallet:        wallet,
+	}
+	nftAPIHandler := &api.NFTApiHandler{
+		BlockChain:    bc,
+		TxPendingPool: txPool,
+	}
 	if err := n.rpcServer.RegisterName("Chain", chainApiHandler); err != nil {
 		log.Fatalf("RPC service register error: %s", err)
 		return err
@@ -163,6 +171,14 @@ func (n *Node) RegisterBackend(
 		return err
 	}
 	if err := n.rpcServer.RegisterName("Net", netAPIHandler); err != nil {
+		log.Fatalf("RPC service register error: %s", err)
+		return err
+	}
+	if err := n.rpcServer.RegisterName("Token", tokenAPIHandler); err != nil {
+		log.Fatalf("RPC service register error: %s", err)
+		return err
+	}
+	if err := n.rpcServer.RegisterName("NFT", nftAPIHandler); err != nil {
 		log.Fatalf("RPC service register error: %s", err)
 		return err
 	}

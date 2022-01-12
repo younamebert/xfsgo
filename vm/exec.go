@@ -124,6 +124,9 @@ func (ce *builtinContractExec) callFn(c BuiltinContract, stvs []*stv, fn common.
 			if sf.Type.Kind() == reflect.Func && bytes.Equal(hash[:], namehash) {
 				mv := cv.MethodByName(aname)
 				return sf, mv, true
+			} else if aname == "Create" && bytes.Equal(hash[:], common.ZeroHash[:]) {
+				mv := cv.MethodByName(aname)
+				return sf, mv, true
 			}
 		}
 		return reflect.Method{}, reflect.Value{}, false

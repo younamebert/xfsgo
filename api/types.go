@@ -19,9 +19,13 @@ package api
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"math/big"
+	"strconv"
 	"xfsgo"
 	"xfsgo/common"
+	"xfsgo/crypto"
 )
 
 type EmptyArgs = interface{}
@@ -160,23 +164,6 @@ func coverTxs2Resp(pending []*xfsgo.Transaction, dst **TransactionsResp) error {
 	return nil
 }
 
-// func coverBlocks2Resp(block []*xfsgo.Block, dst **BlocksResp) error {
-// 	if len(block) == 0 || block == nil {
-// 		return nil
-// 	}
-// 	blocks := make([]*BlockResp, 0)
-// 	for _, item := range block {
-// 		var blockfoll *BlockResp
-// 		if err := coverBlock2Resp(item, &blockfoll); err != nil {
-// 			return err
-// 		}
-// 		blocks = append(blocks, blockfoll)
-// 	}
-// 	*dst = (*BlocksResp)(&blocks)
-// 	return nil
-
-// }
-
 func coverBlock2Resp(block *xfsgo.Block, dst **BlockResp) error {
 	if block == nil {
 		return nil
@@ -271,4 +258,96 @@ func coverState2Resp(state *xfsgo.StateObj, dst **StateObjResp) error {
 	result.Nonce = state.GetNonce()
 	*dst = result
 	return nil
+}
+
+type TransactionGasParams struct {
+	Value    string `json:"value"`
+	GasLimit string `json:"gas_limit"`
+	GasPrice string `json:"gas_price"`
+}
+
+type StringRawTransaction struct {
+	Version   string `json:"version"`
+	To        string `json:"to"`
+	Value     string `json:"value"`
+	Data      string `json:"data"`
+	GasLimit  string `json:"gas_limit"`
+	GasPrice  string `json:"gas_price"`
+	Signature string `json:"signature"`
+	Nonce     string `json:"nonce"`
+}
+
+func (t *StringRawTransaction) String() string {
+	jsondata, err := json.Marshal(t)
+	if err != nil {
+		panic(err)
+	}
+	return string(jsondata)
+}
+
+func CoverTransaction(r *StringRawTransaction) (*xfsgo.Transaction, error) {
+	version, err := strconv.ParseInt(r.Version, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse version: %s", err)
+	}
+	signature := common.Hex2bytes(r.Signature)
+	if signature == nil || len(signature) < 1 {
+		return nil, fmt.Errorf("failed to parse signature: %s", err)
+	}
+	toaddr := common.ZeroAddr
+	if r.To != "" {
+		toaddr = common.StrB58ToAddress(r.To)
+		if !crypto.VerifyAddress(toaddr) {
+			return nil, fmt.Errorf("failed to verify 'to' address: %s", r.To)
+		}
+	} else if r.Data == "" {
+		return nil, fmt.Errorf("failed to parse 'to' address")
+	}
+	gasprice, ok := new(big.Int).SetString(r.GasPrice, 10)
+	if !ok {
+		return nil, fmt.Errorf("failed to parse gasprice")
+	}
+	gaslimit, ok := new(big.Int).SetString(r.GasLimit, 10)
+	if !ok {
+		return nil, fmt.Errorf("failed to parse gasprice")
+	}
+	data := common.Hex2bytes(r.Data)
+	nonce, err := strconv.ParseInt(r.Nonce, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse nonce: %s", err)
+	}
+	value, ok := new(big.Int).SetString(r.Value, 10)
+	if !ok {
+		return nil, fmt.Errorf("failed to parse value")
+	}
+	return xfsgo.NewTransactionByStd(&xfsgo.StdTransaction{
+		Version:   uint32(version),
+		To:        toaddr,
+		GasPrice:  gasprice,
+		GasLimit:  gaslimit,
+		Data:      data,
+		Nonce:     uint64(nonce),
+		Value:     value,
+		Signature: signature,
+	}), nil
+}
+
+func ParseTransactionGasParams(r *TransactionGasParams) (*xfsgo.StdTransaction, error) {
+	gasprice, ok := new(big.Int).SetString(r.GasPrice, 10)
+	if !ok && r.GasPrice != "" {
+		return nil, fmt.Errorf("failed to parse gasprice")
+	}
+	gaslimit, ok := new(big.Int).SetString(r.GasLimit, 10)
+	if !ok && r.GasLimit != "" {
+		return nil, fmt.Errorf("failed to parse gaslimit")
+	}
+	value, ok := new(big.Int).SetString(r.Value, 10)
+	if !ok && r.Value != "" {
+		return nil, fmt.Errorf("failed to parse value")
+	}
+	return &xfsgo.StdTransaction{
+		GasPrice: gasprice,
+		GasLimit: gaslimit,
+		Value:    value,
+	}, nil
 }

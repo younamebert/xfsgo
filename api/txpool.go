@@ -21,11 +21,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/sirupsen/logrus"
-	"math/big"
-	"strconv"
 	"xfsgo"
 	"xfsgo/common"
-	"xfsgo/crypto"
 )
 
 type TxPoolHandler struct {
@@ -48,16 +45,6 @@ type RawTransactionArgs struct {
 
 type RemoveTxHashArgs struct {
 	Hash string `json:"hash"`
-}
-type StringRawTransaction struct {
-	Version   string `json:"version"`
-	To        string `json:"to"`
-	Value     string `json:"value"`
-	Data      string `json:"data"`
-	GasLimit  string `json:"gas_limit"`
-	GasPrice  string `json:"gas_price"`
-	Signature string `json:"signature"`
-	Nonce     string `json:"nonce"`
 }
 
 func (tx *TxPoolHandler) GetPending(_ EmptyArgs, resp **TransactionsResp) error {
@@ -132,59 +119,4 @@ func (tx *TxPoolHandler) SendRawTransaction(args RawTransactionArgs, resp *strin
 	txhash := txdata.Hash()
 	*resp = txhash.Hex()
 	return nil
-}
-
-func (t *StringRawTransaction) String() string {
-	jsondata, err := json.Marshal(t)
-	if err != nil {
-		panic(err)
-	}
-	return string(jsondata)
-}
-
-func CoverTransaction(r *StringRawTransaction) (*xfsgo.Transaction, error) {
-	version, err := strconv.ParseInt(r.Version, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse version: %s", err)
-	}
-	signature := common.Hex2bytes(r.Signature)
-	if signature == nil || len(signature) < 1 {
-		return nil, fmt.Errorf("failed to parse signature: %s", err)
-	}
-	toaddr := common.ZeroAddr
-	if r.To != "" {
-		toaddr = common.StrB58ToAddress(r.To)
-		if !crypto.VerifyAddress(toaddr) {
-			return nil, fmt.Errorf("failed to verify 'to' address: %s", r.To)
-		}
-	} else if r.Data == "" {
-		return nil, fmt.Errorf("failed to parse 'to' address")
-	}
-	gasprice, ok := new(big.Int).SetString(r.GasPrice, 10)
-	if !ok {
-		return nil, fmt.Errorf("failed to parse gasprice")
-	}
-	gaslimit, ok := new(big.Int).SetString(r.GasLimit, 10)
-	if !ok {
-		return nil, fmt.Errorf("failed to parse gasprice")
-	}
-	data := common.Hex2bytes(r.Data)
-	nonce, err := strconv.ParseInt(r.Nonce, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse nonce: %s", err)
-	}
-	value, ok := new(big.Int).SetString(r.Value, 10)
-	if !ok {
-		return nil, fmt.Errorf("failed to parse value")
-	}
-	return xfsgo.NewTransactionByStd(&xfsgo.StdTransaction{
-		Version:   uint32(version),
-		To:        toaddr,
-		GasPrice:  gasprice,
-		GasLimit:  gaslimit,
-		Data:      data,
-		Nonce:     uint64(nonce),
-		Value:     value,
-		Signature: signature,
-	}), nil
 }

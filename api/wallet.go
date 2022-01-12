@@ -75,22 +75,6 @@ func (handler *WalletHandler) Create(_ EmptyArgs, resp *string) error {
 	*resp = addr.B58String()
 	return nil
 }
-func (handler *WalletHandler) CreateToken(_ EmptyArgs, resp *string) error {
-	addr, err := handler.Wallet.AddByRandom()
-	if err != nil {
-		return xfsgo.NewRPCErrorCause(-6001, err)
-	}
-	*resp = addr.B58String()
-	return nil
-}
-func (handler *WalletHandler) CreateNFT(_ EmptyArgs, resp *string) error {
-	addr, err := handler.Wallet.AddByRandom()
-	if err != nil {
-		return xfsgo.NewRPCErrorCause(-6001, err)
-	}
-	*resp = addr.B58String()
-	return nil
-}
 func (handler *WalletHandler) Del(args WalletByAddressArgs, resp *interface{}) error {
 	if args.Address == "" {
 		return xfsgo.NewRPCError(-1006, "del wallet address not null")

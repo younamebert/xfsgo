@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"encoding/binary"
 	"errors"
 	"io"
 )
@@ -99,7 +100,20 @@ func (b *buffer) Write(p []byte) (n int, err error) {
 	}
 	return copy(b.buf[m:], p), nil
 }
-
+func (b *buffer) WriteString(s string) (err error) {
+	slen := len(s)
+	var slenbuf [8]byte
+	binary.LittleEndian.PutUint64(slenbuf[:], uint64(slen))
+	_, err = b.Write(slenbuf[:])
+	if err != nil {
+		return err
+	}
+	_, err = b.Write([]byte(s))
+	if err != nil {
+		return err
+	}
+	return nil
+}
 func (b *buffer) ReadRow() (row, error) {
 	if b.empty() {
 		// Buffer is empty, reset to recover space.

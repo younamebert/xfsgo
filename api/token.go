@@ -1,0 +1,129 @@
+// Copyright 2018 The xfsgo Authors
+// This file is part of the xfsgo library.
+//
+// The xfsgo library is free software: you can redistribute it and/or modify
+// it under the terms of the MIT Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The xfsgo library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// MIT Lesser General Public License for more details.
+//
+// You should have received a copy of the MIT Lesser General Public License
+// along with the xfsgo library. If not, see <https://mit-license.org/>.
+
+package api
+
+import (
+	"bytes"
+	"fmt"
+	"math/big"
+	"xfsgo"
+	"xfsgo/common"
+	"xfsgo/vm"
+)
+
+type TokenCreateParams struct {
+	From        string `json:"from"`
+	Name        string `json:"name"`
+	Symbol      string `json:"symbol"`
+	Decimals    string `json:"decimals"`
+	TotalSupply string `json:"total_supply"`
+}
+
+var (
+	tokenCreateParamsEncode = func(params TokenCreateParams) ([]byte, error) {
+		buf := vm.NewBuffer(nil)
+		if err := buf.WriteString(params.Name); err != nil {
+			return nil, err
+		}
+		if err := buf.WriteString(params.Symbol); err != nil {
+			return nil, err
+		}
+		decimals, ok := new(big.Int).SetString(params.Decimals, 10)
+		if !ok {
+			return nil, fmt.Errorf("failed to parse decimals")
+		}
+		decimalsData := decimals.Bytes()
+		_, err := buf.Write(decimalsData[0:1])
+		if err != nil {
+			return nil, err
+		}
+		totalSupply, ok := new(big.Int).SetString(params.TotalSupply, 10)
+		if !ok {
+			return nil, fmt.Errorf("failed to parse decimals")
+		}
+		totalSupplyData := totalSupply.Bytes()
+		_, err = buf.Write(totalSupplyData)
+		if err != nil {
+			return nil, err
+		}
+		return buf.Bytes(), nil
+	}
+	tokenCode = []byte{
+		0xd0, 0x23, 0x01,
+	}
+	tokenCreateDataEncode = func(params []byte) []byte {
+		inputBuf := bytes.NewBuffer(nil)
+		inputBuf.Write(tokenCode)
+		inputBuf.Write(common.ZeroHash[:])
+		inputBuf.Write(params)
+		return inputBuf.Bytes()
+	}
+)
+
+type TokenApiHandler struct {
+	BlockChain    *xfsgo.BlockChain
+	TxPendingPool *xfsgo.TxPool
+	Wallet        *xfsgo.Wallet
+}
+
+type TokenCreateArgs struct {
+	Value       string `json:"value"`
+	GasLimit    string `json:"gas_limit"`
+	GasPrice    string `json:"gas_price"`
+	From        string `json:"from"`
+	Name        string `json:"name"`
+	Symbol      string `json:"symbol"`
+	Decimals    string `json:"decimals"`
+	TotalSupply string `json:"total_supply"`
+}
+
+func (handler *TokenApiHandler) Create(args TokenCreateArgs, resp **string) error {
+	var fromAddress common.Address
+	if args.From == "" {
+		fromAddress = handler.Wallet.GetDefault()
+	} else {
+		fromAddress = common.StrB58ToAddress(args.From)
+	}
+	key, err := handler.Wallet.GetKeyByAddress(fromAddress)
+	if err != nil {
+		return xfsgo.NewRPCErrorCause(-32603, err)
+	}
+	stdTx, err := ParseTransactionGasParams(&TransactionGasParams{
+		GasPrice: args.GasPrice,
+		GasLimit: args.GasLimit,
+		Value:    args.Value,
+	})
+	if err != nil {
+		return xfsgo.NewRPCErrorCause(-32603, err)
+	}
+	params, err := tokenCreateParamsEncode(TokenCreateParams{
+		Name:        args.Name,
+		Symbol:      args.Symbol,
+		Decimals:    args.Decimals,
+		TotalSupply: args.TotalSupply,
+	})
+	if err != nil {
+		return xfsgo.NewRPCErrorCause(-32603, err)
+	}
+	stdTx.Data = tokenCreateDataEncode(params)
+	stdTx.Nonce = handler.TxPendingPool.State().GetNonce(fromAddress) + 1
+	txn := xfsgo.NewTransactionByStdAndSign(stdTx, key)
+	_ = txn
+	//args.
+	*resp = nil
+	return nil
+}

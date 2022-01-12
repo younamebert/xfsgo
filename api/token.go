@@ -110,6 +110,16 @@ func (handler *TokenApiHandler) Create(args TokenCreateArgs, resp **string) erro
 	if err != nil {
 		return xfsgo.NewRPCErrorCause(-32603, err)
 	}
+	if stdTx.GasPrice != nil && stdTx.GasPrice.Sign() < 0 {
+		return xfsgo.NewRPCErrorCause(-32603, fmt.Errorf("gas price must be >= 0"))
+	} else if stdTx.GasPrice == nil || stdTx.GasPrice.Sign() == 0 {
+		stdTx.GasPrice = common.NanoCoin2Atto(common.TxGasPrice)
+	}
+	if stdTx.GasLimit != nil && stdTx.GasLimit.Sign() < 0 {
+		return xfsgo.NewRPCErrorCause(-32603, fmt.Errorf("gas limit must be >= 0"))
+	} else if stdTx.GasLimit == nil || stdTx.GasLimit.Sign() == 0 {
+		stdTx.GasLimit = common.TxGas
+	}
 	params, err := tokenCreateParamsEncode(TokenCreateParams{
 		Name:        args.Name,
 		Symbol:      args.Symbol,
@@ -122,8 +132,11 @@ func (handler *TokenApiHandler) Create(args TokenCreateArgs, resp **string) erro
 	stdTx.Data = tokenCreateDataEncode(params)
 	stdTx.Nonce = handler.TxPendingPool.State().GetNonce(fromAddress) + 1
 	txn := xfsgo.NewTransactionByStdAndSign(stdTx, key)
-	_ = txn
-	//args.
-	*resp = nil
+	if err = handler.TxPendingPool.Add(txn); err != nil {
+		return xfsgo.NewRPCErrorCause(-32603, err)
+	}
+	hash := txn.Hash()
+	txhash := hash.Hex()
+	*resp = &txhash
 	return nil
 }

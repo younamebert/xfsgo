@@ -321,13 +321,6 @@ func (m *Miner) waitworker() {
 
 			// work := result.Work
 
-			// addr := block.Coinbase()
-			// keyhash := ahash.SHA256(addr.Bytes())
-			// m.stateDb.Foreach(func(k string, v []byte) error {
-			// 	fmt.Printf("key:%v v:%v\n", k, string(v))
-			// 	return nil
-			// })
-
 			if err := m.chain.WriteBlock(block); err != nil {
 				logrus.Errorf("Failed writing block to chain err:%v", err)
 				continue
@@ -573,7 +566,7 @@ func (m *Miner) StartMining(threads *int) error {
 		SetThreads(threads int)
 	}
 	if th, ok := m.engine.(threaded); ok {
-		logrus.Info("Updated mining threads", "threads", *threads)
+		logrus.Infof("Updated mining threads:%v", *threads)
 		th.SetThreads(*threads)
 	}
 
@@ -600,17 +593,6 @@ func (m *Miner) SignHash(account common.Address, hash []byte) ([]byte, error) {
 	}
 	return crypto.ECDSASign(hash, prikey)
 }
-
-// func (m *Miner) SetWorkers(num uint32) error {
-// 	if num < 1 {
-// 		return errors.New("number too low")
-// 	} else if num > maxWorkers {
-// 		return errors.New("number over max value")
-// 	}
-// 	m.updateNumWorkers <- num
-// 	m.numWorkers = num
-// 	return nil
-// }
 
 func (m *Miner) SetCoinbase(address common.Address) {
 	m.Coinbase = address

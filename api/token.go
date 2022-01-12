@@ -22,6 +22,7 @@ import (
 	"math/big"
 	"xfsgo"
 	"xfsgo/common"
+	"xfsgo/storage/badger"
 	"xfsgo/vm"
 )
 
@@ -55,8 +56,8 @@ var (
 		if !ok {
 			return nil, fmt.Errorf("failed to parse decimals")
 		}
-		totalSupplyData := totalSupply.Bytes()
-		_, err = buf.Write(totalSupplyData)
+		totalSupplyData := vm.NewUint256(totalSupply)
+		_, err = buf.Write(totalSupplyData[:])
 		if err != nil {
 			return nil, err
 		}
@@ -75,6 +76,7 @@ var (
 )
 
 type TokenApiHandler struct {
+	StateDb       badger.IStorage
 	BlockChain    *xfsgo.BlockChain
 	TxPendingPool *xfsgo.TxPool
 	Wallet        *xfsgo.Wallet
@@ -89,6 +91,11 @@ type TokenCreateArgs struct {
 	Symbol      string `json:"symbol"`
 	Decimals    string `json:"decimals"`
 	TotalSupply string `json:"total_supply"`
+}
+
+type TokenGetArgs struct {
+	Address   string `json:"address"`
+	StateRoot string `json:"state_root"`
 }
 
 func (handler *TokenApiHandler) Create(args TokenCreateArgs, resp **string) error {
@@ -130,7 +137,7 @@ func (handler *TokenApiHandler) Create(args TokenCreateArgs, resp **string) erro
 		return xfsgo.NewRPCErrorCause(-32603, err)
 	}
 	stdTx.Data = tokenCreateDataEncode(params)
-	stdTx.Nonce = handler.TxPendingPool.State().GetNonce(fromAddress) + 1
+	stdTx.Nonce = handler.TxPendingPool.State().GetNonce(fromAddress)
 	txn := xfsgo.NewTransactionByStdAndSign(stdTx, key)
 	if err = handler.TxPendingPool.Add(txn); err != nil {
 		return xfsgo.NewRPCErrorCause(-32603, err)
@@ -138,5 +145,36 @@ func (handler *TokenApiHandler) Create(args TokenCreateArgs, resp **string) erro
 	hash := txn.Hash()
 	txhash := hash.Hex()
 	*resp = &txhash
+	return nil
+}
+
+func (handler *TokenApiHandler) GetName(args TokenGetArgs, resp **string) error {
+
+	var stateRoot common.Hash
+	var address common.Address
+	if args.Address == "" {
+		return xfsgo.NewRPCError(-32603, fmt.Sprintf("Contract address not be empty"))
+	} else {
+		address = common.StrB58ToAddress(args.Address)
+	}
+	if args.StateRoot == "" {
+		lastBlock := handler.BlockChain.CurrentBHeader()
+		stateRoot = lastBlock.StateRoot
+	} else {
+		stateRoot = common.Hex2Hash(args.StateRoot)
+	}
+
+	stateTree := xfsgo.NewStateTree(handler.StateDb, stateRoot[:])
+	xvm := vm.NewXVM(stateTree)
+	contract, err := xvm.GetBuiltinContract(address)
+	if err != nil {
+		return xfsgo.NewRPCErrorCause(-32603, err)
+	}
+	token, ok := contract.(vm.Token)
+	if !ok || token == nil {
+		return nil
+	}
+	name := token.GetName().String()
+	*resp = &name
 	return nil
 }

@@ -87,6 +87,9 @@ func (so *StateObj) Decode(data []byte) error {
 }
 
 func (so *StateObj) Encode() ([]byte, error) {
+	if so.balance == nil {
+		so.balance = new(big.Int).SetUint64(0)
+	}
 	objmap := map[string]string{
 		"address": so.address.String(),
 		"balance": so.balance.Text(10),
@@ -96,7 +99,7 @@ func (so *StateObj) Encode() ([]byte, error) {
 	if so.code != nil {
 		objmap["code"] = hex.EncodeToString(so.code)
 	}
-	if !bytes.Equal(so.stateRoot[:], common.HashZ[:]) {
+	if !bytes.Equal(so.stateRoot[:], common.ZeroHash[:]) {
 		objmap["state_root"] = hex.EncodeToString(so.stateRoot[:])
 	}
 	enc := common.SortAndEncodeMap(objmap)
@@ -194,15 +197,19 @@ func (so *StateObj) GetCode() []byte {
 func (so *StateObj) makeStateKey(key [32]byte) []byte {
 	return ahash.SHA256(append(so.address[:], key[:]...))
 }
-func (so *StateObj) getStateTree() *avlmerkle.Tree {
-	return avlmerkle.NewTree(so.db, so.stateRoot[:])
+func (so *StateObj) getStateTree() (*avlmerkle.Tree, error) {
+	return avlmerkle.NewTreeN(so.db, so.stateRoot[:])
 }
 
 func (so *StateObj) GetStateValue(key [32]byte) []byte {
 	if val, exists := so.cacheStorage[key]; exists {
 		return val
 	}
-	if val, ok := so.getStateTree().Get(so.makeStateKey(key)); ok {
+	st, err := so.getStateTree()
+	if err != nil {
+		return nil
+	}
+	if val, ok := st.Get(so.makeStateKey(key)); ok {
 		return val
 	}
 	return nil
@@ -213,10 +220,14 @@ func (so *StateObj) GetStateRoot() common.Hash {
 }
 
 func (so *StateObj) Update() {
-	for k, v := range so.cacheStorage {
-		so.getStateTree().Put(so.makeStateKey(k), v)
+	st, err := so.getStateTree()
+	if err != nil {
+		return
 	}
-	stateRoot := so.getStateTree().Checksum()
+	for k, v := range so.cacheStorage {
+		st.Put(so.makeStateKey(k), v)
+	}
+	stateRoot := st.Checksum()
 	so.stateRoot = common.Bytes2Hash(stateRoot)
 	objRaw, _ := rawencode.Encode(so)
 	hash := ahash.SHA256(so.address[:])
@@ -385,5 +396,10 @@ func (st *StateTree) UpdateAll() {
 }
 
 func (st *StateTree) Commit() error {
+	for _, v := range st.objs {
+		if err := v.merkleTree.Commit(); err != nil {
+			return err
+		}
+	}
 	return st.merkleTree.Commit()
 }

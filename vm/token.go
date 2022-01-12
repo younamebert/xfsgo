@@ -5,6 +5,10 @@ import (
 	"xfsgo/common"
 )
 
+type Token interface {
+	GetName() CTypeString
+}
+
 type token struct {
 	BuiltinContract
 	Name        CTypeString                   `contract:"storage"`

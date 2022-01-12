@@ -141,6 +141,7 @@ func (n *Node) RegisterBackend(
 		NetServer: n.P2PServer(),
 	}
 	tokenAPIHandler := &api.TokenApiHandler{
+		StateDb:       stateDb,
 		BlockChain:    bc,
 		TxPendingPool: txPool,
 		Wallet:        wallet,

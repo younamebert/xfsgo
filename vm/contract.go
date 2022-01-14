@@ -43,11 +43,3 @@ func (abs *absBuiltinContract) GetStateTree() (st core.StateTree) {
 	st = abs.st
 	return
 }
-
-func (abs *absBuiltinContract) BuiltinId() (id uint8) {
-	return
-}
-
-func (abs *absBuiltinContract) Create(func()) (err error) {
-	return
-}

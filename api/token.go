@@ -103,6 +103,12 @@ type TokenGetArgs struct {
 	StateRoot string `json:"state_root"`
 }
 
+type TokenBalanceOfArgs struct {
+	Contract  string `json:"contract"`
+	StateRoot string `json:"state_root"`
+	Address   string `json:"address"`
+}
+
 type TokenScheme struct {
 	Name        string `json:"name"`
 	Symbol      string `json:"symbol"`
@@ -216,6 +222,33 @@ func (handler *TokenApiHandler) GetScheme(args TokenGetArgs, resp *TokenScheme) 
 	}
 	return nil
 }
-func (handler *TokenApiHandler) BalanceOf(args TokenGetArgs, resp *TokenScheme) error {
+func (handler *TokenApiHandler) BalanceOf(args TokenBalanceOfArgs, resp *string) error {
+	var stateRoot common.Hash
+	var contractAddress common.Address
+	if args.Address == "" {
+		return xfsgo.NewRPCError(-32603, fmt.Sprintf("Contract address not be empty"))
+	} else {
+		contractAddress = common.StrB58ToAddress(args.Contract)
+	}
+	if args.StateRoot == "" {
+		lastBlock := handler.BlockChain.CurrentBHeader()
+		stateRoot = lastBlock.StateRoot
+	} else {
+		stateRoot = common.Hex2Hash(args.StateRoot)
+	}
+	stateTree := xfsgo.NewStateTree(handler.StateDb, stateRoot[:])
+	xvm := vm.NewXVM(stateTree)
+	contract, err := xvm.GetBuiltinContract(contractAddress)
+	if err != nil {
+		return xfsgo.NewRPCErrorCause(-32603, err)
+	}
+	token, ok := contract.(vm.Token)
+	if !ok || token == nil {
+		return nil
+	}
+	callAddress := common.StrB58ToAddress(args.Address)
+	balance := token.BalanceOf(vm.NewAddress(callAddress))
+	balanceString := balance.BigInt().Text(10)
+	*resp = balanceString
 	return nil
 }

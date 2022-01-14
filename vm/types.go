@@ -159,3 +159,8 @@ func NewUint256(n *big.Int) (m CTypeUint256) {
 	copy(m[:], bs)
 	return
 }
+
+func NewAddress(n common.Address) (m CTypeAddress) {
+	copy(m[:], n[:])
+	return
+}

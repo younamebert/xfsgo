@@ -224,5 +224,7 @@ func (ce *builtinContractExec) MakeBuiltinContract() (BuiltinContract, []*stv, e
 	if err := ce.setupContract(cv.Interface(), stvs); err != nil {
 		return nil, nil, err
 	}
+	bc := cv.Interface().(ContractHelper)
+	_ = bc
 	return cv.Interface().(BuiltinContract), stvs, nil
 }

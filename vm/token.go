@@ -10,7 +10,7 @@ type Token interface {
 	GetSymbol() CTypeString
 	GetDecimals() CTypeUint8
 	GetTotalSupply() CTypeUint256
-	BalanceOf(common.Address) CTypeUint256
+	BalanceOf(address CTypeAddress) CTypeUint256
 }
 
 type token struct {
@@ -62,7 +62,7 @@ func (t *token) GetDecimals() CTypeUint8 {
 func (t *token) GetTotalSupply() CTypeUint256 {
 	return t.TotalSupply
 }
-func (t *token) BalanceOf(common.Address) CTypeUint256 {
+func (t *token) BalanceOf(CTypeAddress) CTypeUint256 {
 	return CTypeUint256{}
 }
 func (t *token) Transfer(addr common.Address, val CTypeUint256) CTypeBool {

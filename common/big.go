@@ -27,6 +27,8 @@ var (
 	Big50         = new(big.Int).SetInt64(50)
 	Big64         = new(big.Int).SetInt64(64)
 	Big100        = new(big.Int).SetInt64(100)
+	Big1K         = new(big.Int).SetInt64(1000)
+	Big10K        = new(big.Int).SetInt64(10000)
 	Big256        = new(big.Int).SetInt64(256)
 	Big32Bits     = new(big.Int).Exp(Big2, Big32, nil)
 	Big64Bits     = new(big.Int).Exp(Big2, Big64, nil)

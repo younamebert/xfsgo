@@ -7,6 +7,10 @@ import (
 
 type Token interface {
 	GetName() CTypeString
+	GetSymbol() CTypeString
+	GetDecimals() CTypeUint8
+	GetTotalSupply() CTypeUint256
+	BalanceOf(common.Address) CTypeUint256
 }
 
 type token struct {
@@ -27,6 +31,7 @@ func (t *token) Create(
 	t.Symbol = symbol
 	t.Decimals = decimals
 	t.TotalSupply = totalSupply
+	t.Balances = make(map[CTypeAddress]CTypeUint256)
 	return nil
 }
 

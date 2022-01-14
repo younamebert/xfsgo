@@ -34,6 +34,7 @@ import (
 // Finally, call Commit method to write the modified merkleTree into a database.
 type StateObj struct {
 	merkleTree   *avlmerkle.Tree
+	stateTree    *avlmerkle.Tree
 	address      common.Address //hash of address of the account
 	balance      *big.Int
 	nonce        uint64
@@ -197,19 +198,18 @@ func (so *StateObj) GetCode() []byte {
 func (so *StateObj) makeStateKey(key [32]byte) []byte {
 	return ahash.SHA256(append(so.address[:], key[:]...))
 }
-func (so *StateObj) getStateTree() (*avlmerkle.Tree, error) {
-	return avlmerkle.NewTreeN(so.db, so.stateRoot[:])
+func (so *StateObj) getStateTree() *avlmerkle.Tree {
+	if so.stateTree == nil {
+		so.stateTree = avlmerkle.NewTree(so.db, so.stateRoot[:])
+	}
+	return so.stateTree
 }
 
 func (so *StateObj) GetStateValue(key [32]byte) []byte {
 	if val, exists := so.cacheStorage[key]; exists {
 		return val
 	}
-	st, err := so.getStateTree()
-	if err != nil {
-		return nil
-	}
-	if val, ok := st.Get(so.makeStateKey(key)); ok {
+	if val, ok := so.getStateTree().Get(so.makeStateKey(key)); ok {
 		return val
 	}
 	return nil
@@ -220,10 +220,7 @@ func (so *StateObj) GetStateRoot() common.Hash {
 }
 
 func (so *StateObj) Update() {
-	st, err := so.getStateTree()
-	if err != nil {
-		return
-	}
+	st := so.getStateTree()
 	for k, v := range so.cacheStorage {
 		st.Put(so.makeStateKey(k), v)
 	}
@@ -322,7 +319,9 @@ func (st *StateTree) GetStateObj(addr common.Address) *StateObj {
 	}
 	hash := ahash.SHA256(addr.Bytes())
 	if val, has := st.merkleTree.Get(hash); has {
-		obj := &StateObj{}
+		obj := &StateObj{
+			db: st.treeDB,
+		}
 		if err := rawencode.Decode(val, obj); err != nil {
 			return nil
 		}
@@ -397,8 +396,10 @@ func (st *StateTree) UpdateAll() {
 
 func (st *StateTree) Commit() error {
 	for _, v := range st.objs {
-		if err := v.merkleTree.Commit(); err != nil {
-			return err
+		if v.stateTree != nil {
+			if err := v.stateTree.Commit(); err != nil {
+				return err
+			}
 		}
 	}
 	return st.merkleTree.Commit()

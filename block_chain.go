@@ -24,7 +24,6 @@ import (
 	"sync"
 	"time"
 	"xfsgo/common"
-	"xfsgo/crypto"
 	"xfsgo/storage/badger"
 	"xfsgo/vm"
 
@@ -977,8 +976,6 @@ func (bc *BlockChain) ApplyTransaction(
 	if TxToAddrNotSet(tx) {
 		mVm := vm.NewXVM(stateTree)
 		if err = mVm.Create(sender.address, tx.Data); err == nil {
-			caddr := crypto.CreateAddress(sender.address.Hash(), sender.nonce)
-			logrus.Infof("Create contract success: address=%s", caddr.B58String())
 			status = 1
 		}
 	} else {

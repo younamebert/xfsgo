@@ -18,10 +18,12 @@ package api
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"xfsgo"
 	"xfsgo/common"
+	"xfsgo/crypto"
 	"xfsgo/storage/badger"
 	"xfsgo/vm"
 )
@@ -92,13 +94,23 @@ type TokenCreateArgs struct {
 	Decimals    string `json:"decimals"`
 	TotalSupply string `json:"total_supply"`
 }
-
+type TokenCreateResult struct {
+	TransactionHash string `json:"transaction_hash"`
+	ContractAddress string `json:"contract_address"`
+}
 type TokenGetArgs struct {
 	Address   string `json:"address"`
 	StateRoot string `json:"state_root"`
 }
 
-func (handler *TokenApiHandler) Create(args TokenCreateArgs, resp **string) error {
+type TokenScheme struct {
+	Name        string `json:"name"`
+	Symbol      string `json:"symbol"`
+	Decimals    uint8  `json:"decimals"`
+	TotalSupply string `json:"total_supply"`
+}
+
+func (handler *TokenApiHandler) Create(args TokenCreateArgs, resp *TokenCreateResult) error {
 	var fromAddress common.Address
 	if args.From == "" {
 		fromAddress = handler.Wallet.GetDefault()
@@ -144,11 +156,16 @@ func (handler *TokenApiHandler) Create(args TokenCreateArgs, resp **string) erro
 	}
 	hash := txn.Hash()
 	txhash := hash.Hex()
-	*resp = &txhash
+
+	caddr := crypto.CreateAddress(fromAddress.Hash(), stdTx.Nonce)
+	*resp = TokenCreateResult{
+		TransactionHash: txhash,
+		ContractAddress: caddr.B58String(),
+	}
 	return nil
 }
 
-func (handler *TokenApiHandler) GetName(args TokenGetArgs, resp **string) error {
+func (handler *TokenApiHandler) GetScheme(args TokenGetArgs, resp *TokenScheme) error {
 
 	var stateRoot common.Hash
 	var address common.Address
@@ -174,7 +191,31 @@ func (handler *TokenApiHandler) GetName(args TokenGetArgs, resp **string) error 
 	if !ok || token == nil {
 		return nil
 	}
-	name := token.GetName().String()
-	*resp = &name
+	name := token.GetName()
+	var nameString string
+	if !bytes.Equal(name[:], vm.CTypeString{}) {
+		nameString = name.String()
+	}
+	symbol := token.GetSymbol()
+	var symbolString string
+	if !bytes.Equal(symbol[:], vm.CTypeString{}) {
+		symbolString = symbol.String()
+	}
+	totalSupply := token.GetTotalSupply()
+	var emptyUint256 = vm.CTypeUint256{}
+	var totalSupplyHex string
+	if !bytes.Equal(totalSupply[:], emptyUint256[:]) {
+		totalSupplyHex = hex.EncodeToString(totalSupply[:])
+	}
+	decimals := token.GetDecimals()
+	*resp = TokenScheme{
+		Name:        nameString,
+		Symbol:      symbolString,
+		Decimals:    decimals.Uint8(),
+		TotalSupply: totalSupplyHex,
+	}
+	return nil
+}
+func (handler *TokenApiHandler) BalanceOf(args TokenGetArgs, resp *TokenScheme) error {
 	return nil
 }

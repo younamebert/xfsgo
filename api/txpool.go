@@ -20,9 +20,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/sirupsen/logrus"
+	"strconv"
 	"xfsgo"
 	"xfsgo/common"
+	"xfsgo/crypto"
+
+	"github.com/sirupsen/logrus"
 )
 
 type TxPoolHandler struct {
@@ -31,6 +34,10 @@ type TxPoolHandler struct {
 
 type GetTranByHashArgs struct {
 	Hash string `json:"hash"`
+}
+
+type GetAddrNonceByHashArgs struct {
+	Address string `json:"address"`
 }
 
 // type ModTranGasArgs struct {
@@ -91,6 +98,21 @@ func (tx *TxPoolHandler) GetTranByHash(args GetTranByHashArgs, resp **xfsgo.Tran
 	if tranObj != nil {
 		*resp = tranObj
 	}
+	return nil
+}
+
+func (tx *TxPoolHandler) GetAddrTxNonce(args GetAddrNonceByHashArgs, resp *string) error {
+	if args.Address == "" {
+		return xfsgo.NewRPCError(-1006, "Parameter data cannot be empty")
+	}
+	state := tx.TxPool.State()
+	addr := common.B58ToAddress([]byte(args.Address))
+	if !crypto.VerifyAddress(addr) {
+		return xfsgo.NewRPCErrorCause(-32001, fmt.Errorf("failed to verify 'from' address: %s", addr))
+	}
+	nonce := state.GetNonce(addr)
+
+	*resp = strconv.FormatUint(nonce, 10)
 	return nil
 }
 

@@ -240,6 +240,7 @@ func NewStateTree(db badger.IStorage, root []byte) *StateTree {
 	st.merkleTree = avlmerkle.NewTree(st.treeDB, root)
 	return st
 }
+
 func NewStateTreeN(db badger.IStorage, root []byte) (*StateTree, error) {
 	var err error
 	st := &StateTree{
@@ -250,6 +251,7 @@ func NewStateTreeN(db badger.IStorage, root []byte) (*StateTree, error) {
 	st.merkleTree, err = avlmerkle.NewTreeN(st.treeDB, root)
 	return st, err
 }
+
 func (st *StateTree) HashAccount(addr common.Address) bool {
 	return st.GetStateObj(addr) != nil
 }

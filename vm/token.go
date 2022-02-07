@@ -5,6 +5,14 @@ import (
 	"xfsgo/common"
 )
 
+type Token interface {
+	GetName() CTypeString
+	GetSymbol() CTypeString
+	GetDecimals() CTypeUint8
+	GetTotalSupply() CTypeUint256
+	BalanceOf(address CTypeAddress) CTypeUint256
+}
+
 type token struct {
 	BuiltinContract
 	Name        CTypeString                   `contract:"storage"`
@@ -23,6 +31,7 @@ func (t *token) Create(
 	t.Symbol = symbol
 	t.Decimals = decimals
 	t.TotalSupply = totalSupply
+	t.Balances = make(map[CTypeAddress]CTypeUint256)
 	return nil
 }
 
@@ -53,7 +62,7 @@ func (t *token) GetDecimals() CTypeUint8 {
 func (t *token) GetTotalSupply() CTypeUint256 {
 	return t.TotalSupply
 }
-func (t *token) BalanceOf(common.Address) CTypeUint256 {
+func (t *token) BalanceOf(CTypeAddress) CTypeUint256 {
 	return CTypeUint256{}
 }
 func (t *token) Transfer(addr common.Address, val CTypeUint256) CTypeBool {

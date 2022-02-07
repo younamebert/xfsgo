@@ -9,7 +9,7 @@ var TxGasPrice = big.NewInt(10)
 var GenesisGasLimit = new(big.Int).Mul(TxGas, Big100)
 var MinGasLimit = TxGas
 
-var TxPoolGasLimit = new(big.Int).Mul(TxGas, Big100)
+var TxPoolGasLimit = new(big.Int).Mul(TxGas, Big1K)
 
 func CalcTxInitialCost(data []byte) *big.Int {
 	igas := new(big.Int).Set(TxGas)

@@ -24,9 +24,6 @@ import (
 	"xfsgo/common/rawencode"
 	"xfsgo/lru"
 	"xfsgo/storage/badger"
-
-	// "github.com/btcsuite/goleveldb/leveldb/journal"
-	"github.com/sirupsen/logrus"
 )
 
 type Tree struct {
@@ -62,7 +59,7 @@ func NewTreeN(db badger.IStorage, root []byte) (*Tree, error) {
 	if root != nil && len(root) == 32 && bytes.Compare(root, zero[:]) > common.Zero {
 		t.root, err = t.loadNode(root)
 		if err != nil {
-			logrus.Errorf("Faild load tree: root=%x", root[len(root)-4:])
+			//logrus.Debugf("Faild load tree: root=%x", root[len(root)-4:])
 			return nil, err
 		}
 	}

@@ -16,7 +16,7 @@ type CTypeUint256 [32]byte
 type CTypeString []byte
 type CTypeAddress [25]byte
 
-func (t CTypeUint8) uint8() uint8 {
+func (t CTypeUint8) Uint8() uint8 {
 	return t[0]
 }
 
@@ -157,5 +157,10 @@ func NewUint64(n uint64) (m CTypeUint64) {
 func NewUint256(n *big.Int) (m CTypeUint256) {
 	bs := n.Bytes()
 	copy(m[:], bs)
+	return
+}
+
+func NewAddress(n common.Address) (m CTypeAddress) {
+	copy(m[:], n[:])
 	return
 }

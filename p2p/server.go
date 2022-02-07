@@ -283,6 +283,9 @@ func (srv *server) listenAndServe(realPort int) error {
 	}
 	addr.Port = realPort
 	ln, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return err
+	}
 	laddr := ln.Addr().(*net.TCPAddr)
 	if err != nil {
 		srv.logger.Errorf("P2P listen and serve on %s err: %v", laddr, err)

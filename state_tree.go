@@ -34,7 +34,6 @@ import (
 // Finally, call Commit method to write the modified merkleTree into a database.
 type StateObj struct {
 	merkleTree   *avlmerkle.Tree
-	stateTree    *avlmerkle.Tree
 	address      common.Address //hash of address of the account
 	balance      *big.Int
 	nonce        uint64
@@ -88,9 +87,6 @@ func (so *StateObj) Decode(data []byte) error {
 }
 
 func (so *StateObj) Encode() ([]byte, error) {
-	if so.balance == nil {
-		so.balance = new(big.Int).SetUint64(0)
-	}
 	objmap := map[string]string{
 		"address": so.address.String(),
 		"balance": so.balance.Text(10),
@@ -100,7 +96,7 @@ func (so *StateObj) Encode() ([]byte, error) {
 	if so.code != nil {
 		objmap["code"] = hex.EncodeToString(so.code)
 	}
-	if !bytes.Equal(so.stateRoot[:], common.ZeroHash[:]) {
+	if !bytes.Equal(so.stateRoot[:], common.HashZ[:]) {
 		objmap["state_root"] = hex.EncodeToString(so.stateRoot[:])
 	}
 	enc := common.SortAndEncodeMap(objmap)
@@ -199,10 +195,7 @@ func (so *StateObj) makeStateKey(key [32]byte) []byte {
 	return ahash.SHA256(append(so.address[:], key[:]...))
 }
 func (so *StateObj) getStateTree() *avlmerkle.Tree {
-	if so.stateTree == nil {
-		so.stateTree = avlmerkle.NewTree(so.db, so.stateRoot[:])
-	}
-	return so.stateTree
+	return avlmerkle.NewTree(so.db, so.stateRoot[:])
 }
 
 func (so *StateObj) GetStateValue(key [32]byte) []byte {
@@ -220,11 +213,10 @@ func (so *StateObj) GetStateRoot() common.Hash {
 }
 
 func (so *StateObj) Update() {
-	st := so.getStateTree()
 	for k, v := range so.cacheStorage {
-		st.Put(so.makeStateKey(k), v)
+		so.getStateTree().Put(so.makeStateKey(k), v)
 	}
-	stateRoot := st.Checksum()
+	stateRoot := so.getStateTree().Checksum()
 	so.stateRoot = common.Bytes2Hash(stateRoot)
 	objRaw, _ := rawencode.Encode(so)
 	hash := ahash.SHA256(so.address[:])
@@ -248,6 +240,7 @@ func NewStateTree(db badger.IStorage, root []byte) *StateTree {
 	st.merkleTree = avlmerkle.NewTree(st.treeDB, root)
 	return st
 }
+
 func NewStateTreeN(db badger.IStorage, root []byte) (*StateTree, error) {
 	var err error
 	st := &StateTree{
@@ -258,6 +251,7 @@ func NewStateTreeN(db badger.IStorage, root []byte) (*StateTree, error) {
 	st.merkleTree, err = avlmerkle.NewTreeN(st.treeDB, root)
 	return st, err
 }
+
 func (st *StateTree) HashAccount(addr common.Address) bool {
 	return st.GetStateObj(addr) != nil
 }
@@ -319,9 +313,7 @@ func (st *StateTree) GetStateObj(addr common.Address) *StateObj {
 	}
 	hash := ahash.SHA256(addr.Bytes())
 	if val, has := st.merkleTree.Get(hash); has {
-		obj := &StateObj{
-			db: st.treeDB,
-		}
+		obj := &StateObj{}
 		if err := rawencode.Decode(val, obj); err != nil {
 			return nil
 		}
@@ -395,12 +387,5 @@ func (st *StateTree) UpdateAll() {
 }
 
 func (st *StateTree) Commit() error {
-	for _, v := range st.objs {
-		if v.stateTree != nil {
-			if err := v.stateTree.Commit(); err != nil {
-				return err
-			}
-		}
-	}
 	return st.merkleTree.Commit()
 }

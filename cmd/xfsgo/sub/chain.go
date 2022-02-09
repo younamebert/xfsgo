@@ -195,7 +195,7 @@ func getTxsByBlockNum(cmd *cobra.Command, args []string) error {
 	}
 	cli := xfsgo.NewClient(config.rpcClientApiHost, config.rpcClientApiTimeOut)
 
-	result := make(map[string]interface{})
+	result := make([]map[string]interface{}, 0)
 	req := &getTxsByBlockNumArgs{
 		Number: args[0],
 	}
@@ -225,7 +225,7 @@ func getTxsByBlockHash(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	result := make(map[string]interface{})
+	result := make([]map[string]interface{}, 0)
 	cli := xfsgo.NewClient(config.rpcClientApiHost, config.rpcClientApiTimeOut)
 	req := getTxsByBlockHashArgs{
 		Hash: args[0],

@@ -22,11 +22,8 @@ func (id NodeId) String() string {
 }
 
 func Hex2NodeId(s string) (NodeId, error) {
-	if strings.HasPrefix(s, "0x") {
-		s = s[2:]
-	}
 	var id NodeId
-	b, err := hex.DecodeString(s)
+	b, err := hex.DecodeString(strings.TrimPrefix(s, "0x"))
 	if err != nil {
 		return id, err
 	} else if len(b) != len(id) {
@@ -35,6 +32,7 @@ func Hex2NodeId(s string) (NodeId, error) {
 	copy(id[:], b)
 	return id, nil
 }
+
 func MustHex2NodeId(in string) NodeId {
 	id, err := Hex2NodeId(in)
 	if err != nil {

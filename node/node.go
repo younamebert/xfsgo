@@ -61,7 +61,8 @@ func New(config *Config) (*Node, error) {
 	for _, nodeUri := range config.P2PBootstraps {
 		node, err := discover.ParseNode(nodeUri)
 		if err != nil {
-			logrus.Warnf("Parse node uri err: %s", err)
+			// logrus.Warnf("Parse node uri err: %s", err)
+			return nil, err
 		}
 		bootstraps = append(bootstraps, node)
 	}
@@ -69,12 +70,13 @@ func New(config *Config) (*Node, error) {
 	for _, nodeUri := range config.P2PStaticNodes {
 		node, err := discover.ParseNode(nodeUri)
 		if err != nil {
-			logrus.Warnf("Parse node uri err: %s", err)
+			// logrus.Warnf("Parse node uri err: %s", err)
+			return nil, err
 		}
 		staticNodes = append(staticNodes, node)
 	}
+
 	enc := new(rawencode.StdEncoder)
-	//logrus.Infof("logger level: %s", logrus.GetLevel())
 	p2pServer := p2p.NewServer(p2p.Config{
 		Encoder:        enc,
 		Nat:            nat.Any(),

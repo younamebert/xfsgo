@@ -1,3 +1,8 @@
+ifeq ($(LANG),)
+  $(info "start make")
+else
+ $(error "error: windows is not supported")
+endif
 
 PWD := $(shell pwd)
 

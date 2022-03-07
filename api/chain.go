@@ -242,14 +242,16 @@ func (handler *ChainAPIHandler) GetReceiptByHash(args GetReceiptByHashArgs, resp
 	if dataReceiptIndex == nil {
 		return xfsgo.NewRPCError(-1006, "Not found")
 	}
+	block := handler.BlockChain.GetBlockByHash(dataReceiptIndex.BlockHash)
 	data := &ReceiptResp{
-		Version:    dataReceipt.Version,
-		Status:     dataReceipt.Status,
-		TxHash:     dataReceipt.TxHash,
-		GasUsed:    dataReceipt.GasUsed,
-		BlockHash:  dataReceiptIndex.BlockHash,
-		BlockIndex: dataReceiptIndex.BlockIndex,
-		TxIndex:    dataReceiptIndex.Index,
+		Version:     dataReceipt.Version,
+		Status:      dataReceipt.Status,
+		TxHash:      dataReceipt.TxHash,
+		GasUsed:     dataReceipt.GasUsed,
+		BlockHeight: block.Height(),
+		BlockHash:   dataReceiptIndex.BlockHash,
+		BlockIndex:  dataReceiptIndex.BlockIndex,
+		TxIndex:     dataReceiptIndex.Index,
 	}
 
 	return coverReceipt(data, resp)

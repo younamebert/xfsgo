@@ -379,8 +379,7 @@ func (m *Miner) execPow(last *xfsgo.BlockHeader, perBlock *xfsgo.Block, quit cha
 
 	enOffset, err := common.RandomUint64()
 	if err != nil {
-		logrus.Errorf("Unexpected error while generating random "+
-			"extra nonce offset: %v", err)
+		logrus.Errorf("Unexpected error while generating random "+"extra nonce offset: %v", err)
 		enOffset = 0
 	}
 	for extraNonce := uint64(0); extraNonce < maxExtraNonce; extraNonce++ {

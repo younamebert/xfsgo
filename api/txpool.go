@@ -120,7 +120,7 @@ func (tx *TxPoolHandler) SendRawTransaction(args RawTransactionArgs, resp *strin
 	if args.Data == "" {
 		return xfsgo.NewRPCError(-1006, "Parameter data cannot be empty")
 	}
-	//logrus.Debugf("Handle RPC request by SendRawTransaction: args.data=%s", args.Data)
+	// logrus.Infof("Handle RPC request by SendRawTransaction: args.data=%s", args.Data)
 	//databytes, err := urlsafeb64.Decode(args.Data)
 	databytes, err := base64.StdEncoding.DecodeString(args.Data)
 	if err != nil {

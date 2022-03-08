@@ -157,6 +157,10 @@ func (pool *TxPool) validatePool() {
 		}
 	}
 }
+func (pool *TxPool) getNonceAt(address common.Address) uint64 {
+	state := pool.currentState()
+	return state.GetNonce(address)
+}
 
 func (pool *TxPool) checkQueue() {
 	state := pool.pendingState
@@ -320,16 +324,15 @@ func (pool *TxPool) GetQueues() []*Transaction {
 	return txs
 }
 
-func (pool *TxPool) GetTransaction(tranHash string) *Transaction {
-	pool.mu.Lock()
-	defer pool.mu.Unlock()
-	pool.checkQueue()
-	pool.validatePool()
-	for _, v := range pool.pending {
-		txhash := v.Hash()
-		tx := txhash.Hex()
-		if tx == tranHash {
-			return v
+func (pool *TxPool) GetTransaction(tranHash common.Hash) *Transaction {
+	pool.mu.RLock()
+	defer pool.mu.RUnlock()
+	if tx, exists := pool.pending[tranHash]; exists {
+		return tx
+	}
+	for _, v := range pool.queue {
+		if tx, exists := v[tranHash]; exists {
+			return tx
 		}
 	}
 	return nil

@@ -87,18 +87,16 @@ func (tx *TxPoolHandler) Clear(_ EmptyArgs, resp *string) error {
 	return nil
 }
 
-func (tx *TxPoolHandler) GetTranByHash(args GetTranByHashArgs, resp **xfsgo.Transaction) error {
+func (tx *TxPoolHandler) GetTranByHash(args GetTranByHashArgs, resp **TransactionResp) error {
 	if args.Hash == "" {
 		return xfsgo.NewRPCError(-1006, "Parameter cannot be empty")
 	}
 	if err := common.HashCalibrator(args.Hash); err != nil {
 		return xfsgo.NewRPCErrorCause(-32001, err)
 	}
-	tranObj := tx.TxPool.GetTransaction(args.Hash)
-	if tranObj != nil {
-		*resp = tranObj
-	}
-	return nil
+
+	tranObj := tx.TxPool.GetTransaction(common.Hex2Hash(args.Hash))
+	return coverTx2Resp(tranObj, resp)
 }
 
 func (tx *TxPoolHandler) GetAddrTxNonce(args GetAddrNonceByHashArgs, resp *string) error {

@@ -75,13 +75,15 @@ type syncMgr struct {
 	cancelCh    chan struct{}
 	// lock
 	//syncLock    sync.Mutex
-	processLock   sync.Mutex
-	cancelLock    sync.RWMutex
-	queue         *syncQueue
-	reportMu      sync.RWMutex
-	lastReport    time.Time
-	synchronising int32
-	lastRecord    uint64
+	processLock      sync.Mutex
+	cancelLock       sync.RWMutex
+	queue            *syncQueue
+	reportMu         sync.RWMutex
+	lastReport       time.Time
+	lastReportHeight uint64
+	synchronising    int32
+	lastRecord       uint64
+	syncStartTime    time.Time
 }
 
 func newSyncMgr(
@@ -273,10 +275,6 @@ func (mgr *syncMgr) findAncestor(p syncpeer) (uint64, error) {
 	if from < 0 {
 		from = 0
 	}
-	//logrus.Debugf("Find ancestor block hashes: chainHeight=%d, start=%d, count=%d, peerId=%x",
-	//	height, from, MaxHashFetch, pid[len(pid)-4:])
-	//logrus.Debugf("Find ancestor block hashes: chainHeight=%d, start=%d, count=%d, peerId=%x",
-	//	height, from, maxHashesFetch, pid[len(pid)-4:])
 	if err = p.RequestHashesFromNumber(uint64(from), maxHashesFetch); err != nil {
 		return 0, err
 	}
@@ -569,9 +567,7 @@ func (mgr *syncMgr) fetchBlocks(from uint64, id discover.NodeId) error {
 	}
 }
 func (mgr *syncMgr) recordSync(num uint64) {
-	if num > mgr.lastRecord {
-		mgr.lastRecord = num
-	}
+	mgr.lastRecord = num
 }
 func (mgr *syncMgr) report(v uint64, t time.Time, id discover.NodeId) {
 	if t.Sub(mgr.lastReport) < (1 * time.Second) {
@@ -579,13 +575,36 @@ func (mgr *syncMgr) report(v uint64, t time.Time, id discover.NodeId) {
 	}
 	head := mgr.chain.CurrentBHeader()
 	nowHeight := head.Height
-	if nowHeight-(v-1) > 0 && nowHeight < mgr.lastRecord {
-		total := mgr.lastRecord - v
-		completed := nowHeight - (v - 1)
-		progress := float64(completed) / float64(total) * float64(100)
-		logrus.Infof("Sync in progress: synced=%.2f%%, id=%x", progress, id[len(id)-4:])
+	syncTotal := mgr.lastRecord - (v - 1)
+	compileNumber := nowHeight - (v - 1)
+	if compileNumber < 0 || mgr.lastReportHeight == nowHeight {
+		return
 	}
+	compile := float64(compileNumber) / float64(syncTotal)
+	timediff := t.Sub(mgr.syncStartTime)
+	var syncSpeed float64
+	if timediff.Seconds() <= 0 {
+		syncSpeed = 0
+	} else {
+		syncSpeed = float64(compileNumber) / timediff.Seconds()
+	}
+	p, err := mgr.peerReportString(id)
+	if err != nil {
+		return
+	}
+	//logrus.Infof("Sync in progress: start=%.2f%%, with=...%x", progress, id[len(id)-4:])
+	logrus.Infof("Sync in progress: localHead=%d, start=%d, end=%d, complete=%d/%d(%.2f%%), speed=%.4f/s, from=%s",
+		nowHeight, v, mgr.lastRecord, compileNumber, syncTotal, compile*100, syncSpeed, p)
 	mgr.lastReport = t
+	mgr.lastReportHeight = nowHeight
+}
+func (mgr *syncMgr) peerReportString(id discover.NodeId) (string, error) {
+	p := mgr.peers.get(id)
+	if p == nil {
+		return "", errors.New("notfound peer")
+	}
+	paddr := p.P2PPeer().RemoteNode().TcpAddr()
+	return fmt.Sprintf("%x@%s", id[:4], paddr.String()), nil
 }
 func (mgr *syncMgr) syncWithPeer(p syncpeer) error {
 	if p == nil {
@@ -604,16 +623,17 @@ func (mgr *syncMgr) syncWithPeer(p syncpeer) error {
 			mgr.eventBus.Publish(xfsgo.SyncDoneEvent{})
 		}
 	}()
-	logrus.Debugf("Synchronise from peer: id=%x", pId[len(pId)-4:])
-
+	pstring, _ := mgr.peerReportString(pId)
+	logrus.Infof("Synchronise from peer: id=%x", pstring)
 	var number uint64
 	if number, err = mgr.findAncestor(p); err != nil {
 		return err
 	}
 	_ = mgr.chain.SetBoundaries(number, p.Height())
-	mgr.recordSync(p.Height())
 
-	logrus.Debugf("Successfully find ancestor: number=%d, peerId=%x", number, pId[len(pId)-4:])
+	mgr.syncStartTime = time.Now()
+	mgr.recordSync(p.Height() + 1)
+	logrus.Infof("Successfully find ancestor: number=%d, peerId=%x", number, pId[len(pId)-4:])
 	errc := make(chan error, 2)
 	go func() {
 		errc <- mgr.fetchHashes(p, number+1)

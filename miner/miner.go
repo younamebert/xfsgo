@@ -547,7 +547,7 @@ func (m *Miner) miningWorkerController(worker uint32) {
 			return
 		}
 		targetHeight := lastblock.Height + 1
-		bits, _ := m.chain.CalcNextRequiredBitsByHeight(lastblock.Height)
+		bits, _ := m.chain.CalcNextRequiredBitsByHeight(lastblock.Height, lastblock.HeaderHash())
 		workLoad := xfsgo.CalcWorkloadByBits(bits)
 		hashRate := m.RunningHashRate()
 		hashRateInt := new(big.Int).SetInt64(int64(hashRate))

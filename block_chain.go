@@ -113,7 +113,7 @@ type IBlockChain interface {
 	GetBlocks(from uint64, count uint64) []*Block
 	FindAncestor(bHeader *BlockHeader, height uint64) *BlockHeader
 	CalcNextRequiredDifficulty() (uint32, error)
-	CalcNextRequiredBitsByHeight(height uint64) (uint32, error)
+	CalcNextRequiredBitsByHeight(height uint64, hash common.Hash) (uint32, error)
 	CurrentStateTree() *StateTree
 }
 
@@ -851,7 +851,7 @@ func (bc *BlockChain) checkBlockHeaderSanity(prev, header *BlockHeader, blockHas
 	if header.Height <= 22180 {
 		return nil
 	} else if header.Height < uint64(totalblocksv2+totalblocksv3) {
-		last, err := bc.calcNextRequiredBitsByHeight(prev.Height)
+		last, err := bc.calcNextRequiredBitsByHeight(prev.Height, prev.HeaderHash())
 		if err != nil {
 			return err
 		}
@@ -861,7 +861,7 @@ func (bc *BlockChain) checkBlockHeaderSanity(prev, header *BlockHeader, blockHas
 	} else if header.Height <= 23555 {
 		return nil
 	} else if header.Height <= uint64(totalblocks) {
-		last, err := bc.calcNextRequiredBitsByHeight(prev.Height)
+		last, err := bc.calcNextRequiredBitsByHeight(prev.Height, prev.HeaderHash())
 		if err != nil {
 			return err
 		}
@@ -1085,14 +1085,14 @@ func (bc *BlockChain) findAncestor(bHeader *BlockHeader, height uint64) *BlockHe
 	}
 	return indexFirst
 }
-func (bc *BlockChain) calcNextRequiredBitsByHeight(height uint64) (uint32, error) {
+func (bc *BlockChain) calcNextRequiredBitsByHeight(height uint64, hash common.Hash) (uint32, error) {
 	if height > 1 && GenesisBits == TestNetGenesisBits {
 		//logrus.Infof("total: %d, end: %d, pre: %d, height: %d", totalblocks, endTimeV1, targetTimePerBlock, int64(height))
 		if int64(height) >= totalblocks {
 			return 0, ErrDifficultyOverflow
 		}
 	}
-	lastBlock := bc.getBlockByNumber(height)
+	lastBlock := bc.GetBlockByHash(hash)
 	if lastBlock == nil {
 		return 0, errors.New("not found block")
 	}
@@ -1145,13 +1145,13 @@ func (bc *BlockChain) CalcNextRequiredDifficulty() (uint32, error) {
 	bc.mu.RLock()
 	lastHeader := bc.currentBHeader
 	bc.mu.RUnlock()
-	return bc.CalcNextRequiredBitsByHeight(lastHeader.Height)
+	return bc.CalcNextRequiredBitsByHeight(lastHeader.Height, lastHeader.HeaderHash())
 }
 
-func (bc *BlockChain) CalcNextRequiredBitsByHeight(height uint64) (uint32, error) {
+func (bc *BlockChain) CalcNextRequiredBitsByHeight(height uint64, hash common.Hash) (uint32, error) {
 	bc.mu.RLock()
 	defer bc.mu.RUnlock()
-	return bc.calcNextRequiredBitsByHeight(height)
+	return bc.calcNextRequiredBitsByHeight(height, hash)
 }
 
 func (bc *BlockChain) CurrentStateTree() *StateTree {

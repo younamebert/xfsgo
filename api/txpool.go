@@ -20,7 +20,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"xfsgo"
 	"xfsgo/common"
 	"xfsgo/crypto"
@@ -99,7 +98,7 @@ func (tx *TxPoolHandler) GetTranByHash(args GetTranByHashArgs, resp **Transactio
 	return coverTx2Resp(tranObj, resp)
 }
 
-func (tx *TxPoolHandler) GetAddrTxNonce(args GetAddrNonceByHashArgs, resp *string) error {
+func (tx *TxPoolHandler) GetAddrTxNonce(args GetAddrNonceByHashArgs, resp *int64) error {
 	if args.Address == "" {
 		return xfsgo.NewRPCError(-1006, "Parameter data cannot be empty")
 	}
@@ -110,7 +109,7 @@ func (tx *TxPoolHandler) GetAddrTxNonce(args GetAddrNonceByHashArgs, resp *strin
 	}
 	nonce := state.GetNonce(addr)
 
-	*resp = strconv.FormatUint(nonce, 10)
+	*resp = int64(nonce)
 	return nil
 }
 
@@ -118,7 +117,7 @@ func (tx *TxPoolHandler) SendRawTransaction(args RawTransactionArgs, resp *strin
 	if args.Data == "" {
 		return xfsgo.NewRPCError(-1006, "Parameter data cannot be empty")
 	}
-	//logrus.Debugf("Handle RPC request by SendRawTransaction: args.data=%s", args.Data)
+	// logrus.Infof("Handle RPC request by SendRawTransaction: args.data=%s", args.Data)
 	//databytes, err := urlsafeb64.Decode(args.Data)
 	databytes, err := base64.StdEncoding.DecodeString(args.Data)
 	if err != nil {

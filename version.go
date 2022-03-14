@@ -9,7 +9,7 @@ import (
 
 var (
 	appname = "xfsgo"
-	version = "0.5.14"
+	version = "0.5.15"
 )
 
 func CurrentVersion() string {

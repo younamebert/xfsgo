@@ -90,7 +90,6 @@ var (
 	tokenCode = []byte{
 		0xd0, 0x23, 0x01,
 	}
-	tokenCreateFnHash = mustReadBytes4hex("4759498ac2a719c619e2c8cf8ee60af2d2407425e95d308eb208425b2a6d427a")
 	tokenCreateParams = func(tt testToken) (d []byte) {
 		buf := NewBuffer(nil)
 		writeStringParams(buf, tt.name)

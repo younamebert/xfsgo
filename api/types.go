@@ -78,15 +78,16 @@ type BlockResp struct {
 }
 
 type TransactionResp struct {
-	Version  uint32         `json:"version"`
-	To       common.Address `json:"to"`
-	GasPrice *big.Int       `json:"gas_price"`
-	GasLimit *big.Int       `json:"gas_limit"`
-	Nonce    uint64         `json:"nonce"`
-	Value    *big.Int       `json:"value"`
-	From     string         `json:"from"`
-	Hash     common.Hash    `json:"hash"`
-	Data     []byte         `json:"data"`
+	Version   uint32         `json:"version"`
+	To        common.Address `json:"to"`
+	GasPrice  *big.Int       `json:"gas_price"`
+	GasLimit  *big.Int       `json:"gas_limit"`
+	Nonce     uint64         `json:"nonce"`
+	Value     *big.Int       `json:"value"`
+	From      string         `json:"from"`
+	Hash      common.Hash    `json:"hash"`
+	Data      []byte         `json:"data"`
+	Signature []byte         `json:"signature"`
 }
 
 type MinerStartArgs struct {

@@ -76,7 +76,6 @@ func (e *EventBus) Publish(data interface{}) {
 	if cs, found := e.subs[rtyp]; found {
 		go func(d interface{}, cs []chan interface{}) {
 			for _, ch := range cs {
-				ch = make(chan interface{}, 1)
 				ch <- d
 			}
 		}(data, cs)

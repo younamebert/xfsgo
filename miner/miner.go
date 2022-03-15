@@ -310,7 +310,7 @@ func (m *Miner) applyTransactions(
 				ignoreTxs[txfrom] = struct{}{}
 				continue
 			}
-			logrus.Warnf("Miner apply transaction err will be remove: %s", err)
+			logrus.Debugf("Miner apply transaction err will be remove: %s", err)
 			m.appendRemove(tx)
 			return nil, nil, err
 		}

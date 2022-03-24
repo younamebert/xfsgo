@@ -19,11 +19,13 @@ package xfsgo
 import (
 	"errors"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"math/big"
 	"sort"
 	"sync"
+	"time"
 	"xfsgo/common"
+
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -38,6 +40,9 @@ var (
 	nonceErr         = errors.New("nonce too low")
 	balanceErr       = errors.New("account not enough balance")
 	gasLimitErr      = errors.New("gas limit too low")
+	// ErrReplaceUnderpriced is returned if a transaction is attempted to be replaced
+	// with a different one without the required price bump.
+	ErrReplaceUnderpriced = errors.New("replacement transaction underpriced")
 )
 
 type stateFn func() *StateTree
@@ -60,6 +65,8 @@ type TxPool struct {
 	minGasPrice  *big.Int
 	pending      map[common.Hash]*Transaction // processable transactions
 	queue        map[common.Address]map[common.Hash]*Transaction
+	wg           sync.WaitGroup               // for shutdown sync
+	beats        map[common.Address]time.Time // Last heartbeat from each known account
 }
 
 // NewTxPool creates a new transaction pool to gather, sort and filter inbound
@@ -75,7 +82,9 @@ func NewTxPool(currentStateFn stateFn, gasLimitFn gasLimitFn, gasPrice *big.Int,
 		pendingState: NewManageState(currentStateFn()),
 	}
 	pool.eventBus = eventBus
+	pool.wg.Add(2)
 	go pool.eventLoop()
+	go pool.expirationLoop()
 	return pool
 }
 
@@ -95,10 +104,53 @@ func (pool *TxPool) add(tx *Transaction) error {
 	if err := pool.validateTx(tx); err != nil {
 		return err
 	}
-	// pool.pending[txHash] = tx
+	// 在尚未确定之前，检查是否满足所需的涨价要求
+	if transfer := pool.pending[txHash]; transfer != nil {
+		if transfer.Nonce == tx.Nonce {
+			threshold := new(big.Int).Div(new(big.Int).Mul(tx.GasPrice, big.NewInt(100+10)), big.NewInt(100))
+			if threshold.Cmp(tx.GasPrice) >= 0 {
+				return ErrReplaceUnderpriced
+			}
+			pool.pending[txHash] = tx
+		}
+	}
 	pool.appendQueueTx(txHash, tx)
 	go pool.eventBus.Publish(TxPreEvent{Tx: tx})
 	return nil
+}
+
+var (
+	evictionInterval = time.Minute // Time interval to check for evictable transactions
+	Lifetime         = 3 * time.Hour
+	PriceBump        = 10
+)
+
+// expirationLoop is a loop that periodically iterates over all accounts with
+// queued transactions and drop all that have been inactive for a prolonged amount
+// of time.
+func (pool *TxPool) expirationLoop() {
+	defer pool.wg.Done()
+
+	evict := time.NewTicker(evictionInterval)
+	defer evict.Stop()
+
+	for {
+		select {
+		case <-evict.C:
+			pool.mu.Lock()
+			for addr := range pool.queue {
+				// Any non-locals old enough should be removed
+				if time.Since(pool.beats[addr]) > Lifetime {
+					for _, tx := range pool.queue[addr] {
+						pool.RemoveTx(tx.Hash())
+					}
+				}
+			}
+			pool.mu.Unlock()
+		case <-pool.quit:
+			return
+		}
+	}
 }
 
 func (pool *TxPool) validateTx(tx *Transaction) error {
@@ -273,6 +325,7 @@ func (pool *TxPool) Add(tx *Transaction) error {
 // eventLoop is the transaction pool's main event loop, waiting for and reacting to
 // outside blockchain events
 func (pool *TxPool) eventLoop() {
+	defer pool.wg.Done()
 	chainHeadEventSub := pool.eventBus.Subscript(ChainHeadEvent{})
 	GasPriceChangedSub := pool.eventBus.Subscript(GasPriceChanged{})
 	defer func() {

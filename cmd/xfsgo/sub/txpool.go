@@ -230,6 +230,7 @@ func init() {
 	getTxpoolCommand.AddCommand(getGetPendingCommand)
 	getTxpoolCommand.AddCommand(getGetQueueCommand)
 	getTxpoolCommand.AddCommand(getGetTranCommand)
+	getTxpoolCommand.AddCommand(RemoveQueuesCommand)
 	getTxpoolCommand.AddCommand(clearTxPoolCommand)
 	getTxpoolCommand.AddCommand(removeTxCommand)
 }

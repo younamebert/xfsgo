@@ -443,7 +443,7 @@ out:
 			break out
 		default:
 		}
-		txs := m.pool.GetTransactions()
+		txs := m.pool.GetPendingTxs()
 		//js,_ :=  json.Marshal(txs)
 		//logrus.Debugf("txs(un-sort): %s", js)
 		xfsgo.SortByPriceAndNonce(txs)

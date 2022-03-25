@@ -54,7 +54,7 @@ type RemoveTxHashArgs struct {
 }
 
 func (tx *TxPoolHandler) GetPending(_ EmptyArgs, resp **TransactionsResp) error {
-	data := tx.TxPool.GetTransactions()
+	data := tx.TxPool.GetPendingTxs()
 	return coverTxs2Resp(data, resp)
 }
 
@@ -64,7 +64,7 @@ func (tx *TxPoolHandler) GetQueue(_ EmptyArgs, resp **TransactionsResp) error {
 }
 
 func (tx *TxPoolHandler) GetPendingSize(_ EmptyArgs, resp *int) error {
-	data := tx.TxPool.GetTransactionsSize()
+	data := tx.TxPool.GetPendingTxsSize()
 	*resp = data
 	return nil
 }
@@ -82,7 +82,7 @@ func (tx *TxPoolHandler) RemoveTx(args RemoveTxHashArgs, resp *string) error {
 }
 
 func (tx *TxPoolHandler) Clear(_ EmptyArgs, resp *string) error {
-	tx.TxPool.RemoveTransactions(tx.TxPool.GetTransactions())
+	tx.TxPool.RemoveTransactions(tx.TxPool.GetPendingTxs())
 	return nil
 }
 

@@ -86,6 +86,11 @@ func (tx *TxPoolHandler) Clear(_ EmptyArgs, resp *string) error {
 	return nil
 }
 
+func (tx *TxPoolHandler) RemoveQueues(_ EmptyArgs, resp *string) error {
+	tx.TxPool.RemoveTransactions(tx.TxPool.GetQueues())
+	return nil
+}
+
 func (tx *TxPoolHandler) GetTranByHash(args GetTranByHashArgs, resp **TransactionResp) error {
 	if args.Hash == "" {
 		return xfsgo.NewRPCError(-1006, "Parameter cannot be empty")

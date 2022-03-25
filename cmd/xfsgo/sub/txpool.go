@@ -62,6 +62,12 @@ var (
 		Short:                 "delete all transactions from the local transaction pool",
 		RunE:                  ClearTxPool,
 	}
+	RemoveQueuesCommand = &cobra.Command{
+		Use:                   "removequeues [options]",
+		DisableFlagsInUseLine: true,
+		Short:                 "delete all queues from the local transaction pool",
+		RunE:                  RemoveQueues,
+	}
 	removeTxCommand = &cobra.Command{
 		Use:                   "removetx [options] <transaction_hash>",
 		DisableFlagsInUseLine: true,
@@ -100,6 +106,21 @@ func ClearTxPool(cmd *cobra.Command, args []string) error {
 	var result string
 	cli := xfsgo.NewClient(config.rpcClientApiHost, config.rpcClientApiTimeOut)
 	err = cli.CallMethod(1, "TxPool.Clear", nil, &result)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func RemoveQueues(cmd *cobra.Command, args []string) error {
+	config, err := parseClientConfig(cfgFile)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	var result string
+	cli := xfsgo.NewClient(config.rpcClientApiHost, config.rpcClientApiTimeOut)
+	err = cli.CallMethod(1, "TxPool.RemoveQueues", nil, &result)
 	if err != nil {
 		return err
 	}

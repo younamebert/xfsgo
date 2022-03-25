@@ -705,7 +705,7 @@ func (mgr *syncMgr) syncTransactions(p syncpeer) {
 	if mgr.txPool == nil {
 		return
 	}
-	txs := mgr.txPool.GetTransactions()
+	txs := mgr.txPool.GetPendingTxs()
 	if len(txs) == 0 {
 		return
 	}

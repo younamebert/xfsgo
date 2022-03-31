@@ -40,7 +40,6 @@ var (
 	nonceErr         = errors.New("nonce too low")
 	balanceErr       = errors.New("account not enough balance")
 	gasLimitErr      = errors.New("gas limit too low")
-
 	// ErrUnderpriced is returned if a transaction's gas price is below the minimum
 	// configured for the transaction pool.
 	ErrUnderpriced = errors.New("transaction underpriced")
@@ -52,11 +51,21 @@ var (
 type stateFn func() *StateTree
 type gasLimitFn func() *big.Int
 
-var (
-	evictionInterval = time.Minute // Time interval to check for evictable transactions
-	Lifetime         = 3 * time.Hour
-	PriceBump        = 10
-)
+type TxPoolConfig struct {
+	TxPoolMaxSize    uint64
+	PriceBump        int64
+	Lifetime         time.Duration
+	EvictionInterval time.Duration // Time interval to check for evictable transactions
+}
+
+func defaultTxPoolConfig() *TxPoolConfig {
+	return &TxPoolConfig{
+		TxPoolMaxSize:    100,
+		PriceBump:        10,
+		Lifetime:         3 * time.Hour,
+		EvictionInterval: time.Minute,
+	}
+}
 
 // TxPool contains all currently known transactions. Transactions
 // enter the pool when they are received from the network or submitted
@@ -67,12 +76,14 @@ var (
 // two states over time as they are received and processed.
 type TxPool struct {
 	quit         chan bool
+	config       *TxPoolConfig
 	currentState stateFn // The state function which will allow us to do some pre checkes
 	pendingState *ManagedState
 	eventBus     *EventBus
 	mu           sync.RWMutex
 	gasLimitFn   gasLimitFn // The current gas limit function callback
 	minGasPrice  *big.Int
+	priced       []*Transaction
 	pending      map[common.Hash]*Transaction // processable transactions
 	queue        map[common.Address]map[common.Hash]*Transaction
 	beats        map[common.Address]time.Time // Last heartbeat from each known account
@@ -81,16 +92,22 @@ type TxPool struct {
 
 // NewTxPool creates a new transaction pool to gather, sort and filter inbound
 // transactions from the network.
-func NewTxPool(currentStateFn stateFn, gasLimitFn gasLimitFn, gasPrice *big.Int, eventBus *EventBus) *TxPool {
+func NewTxPool(config *TxPoolConfig, currentStateFn stateFn, gasLimitFn gasLimitFn, gasPrice *big.Int, eventBus *EventBus) *TxPool {
 	pool := &TxPool{
 		pending:      make(map[common.Hash]*Transaction),
 		queue:        make(map[common.Address]map[common.Hash]*Transaction),
 		quit:         make(chan bool),
 		beats:        make(map[common.Address]time.Time),
+		priced:       make([]*Transaction, 0),
 		gasLimitFn:   gasLimitFn,
+		config:       defaultTxPoolConfig(),
 		minGasPrice:  gasPrice,
 		currentState: currentStateFn,
 		pendingState: NewManageState(currentStateFn()),
+	}
+
+	if config != nil {
+		pool.config = config
 	}
 	pool.eventBus = eventBus
 	pool.resetState()
@@ -117,10 +134,27 @@ func (pool *TxPool) add(tx *Transaction) error {
 		return err
 	}
 
+	// If the transaction pool is full, discard underpriced transactions
+	if pool.GetTxPoolSize() >= pool.config.TxPoolMaxSize {
+		// If the new transaction is underpriced, don't accept it
+		if tx.GasPrice.Cmp(pool.priced[len(pool.priced)-1].GasPrice) < 1 {
+			// Discarding underpriced transaction
+			return ErrUnderpriced
+		}
+		// New transaction is better than our worse ones, make room for it
+		drop := int(pool.GetTxPoolSize()) - int(pool.config.TxPoolMaxSize-1)
+		dropmap := pool.priced[len(pool.priced)-drop:]
+		for _, tx := range dropmap {
+			pool.RemoveTx(tx.Hash())
+		}
+		pool.priced = pool.priced[:len(pool.priced)-drop]
+		// pool.updatePriced(newPriced)
+	}
+
 	// Meet the price increase range and replace the transaction
 	if transfer := pool.pending[txHash]; transfer != nil {
 		if transfer.Nonce == tx.Nonce {
-			threshold := new(big.Int).Div(new(big.Int).Mul(tx.GasPrice, big.NewInt(100+10)), big.NewInt(100))
+			threshold := new(big.Int).Div(new(big.Int).Mul(tx.GasPrice, big.NewInt(100+pool.config.PriceBump)), big.NewInt(100))
 			if threshold.Cmp(tx.GasPrice) >= 0 {
 				return ErrReplaceUnderpriced
 			} else {
@@ -132,9 +166,21 @@ func (pool *TxPool) add(tx *Transaction) error {
 	}
 
 	pool.appendQueueTx(txHash, tx)
+	pool.addPriced(tx)
 	go pool.eventBus.Publish(TxPreEvent{Tx: tx})
 	return nil
 }
+
+func (pool *TxPool) addPriced(tx *Transaction) {
+	pool.priced = append(pool.priced, tx)
+	sort.Sort(TxByPrice(pool.priced))
+	// common.MarshalIndent(pool)
+}
+
+// func (pool *TxPool) updatePriced(tx []*Transaction) {
+// 	pool.priced = tx
+// 	sort.Sort(TxByPrice(pool.priced))
+// }
 
 // expirationLoop is a loop that periodically iterates over all accounts with
 // queued transactions and drop all that have been inactive for a prolonged amount
@@ -142,7 +188,7 @@ func (pool *TxPool) add(tx *Transaction) error {
 func (pool *TxPool) expirationLoop() {
 	defer pool.wg.Done()
 
-	evict := time.NewTicker(evictionInterval)
+	evict := time.NewTicker(pool.config.EvictionInterval)
 	defer evict.Stop()
 
 	for {
@@ -151,7 +197,7 @@ func (pool *TxPool) expirationLoop() {
 			pool.mu.Lock()
 			for addr := range pool.queue {
 				// Any non-locals old enough should be removed
-				if time.Since(pool.beats[addr]) > Lifetime {
+				if time.Since(pool.beats[addr]) > pool.config.Lifetime {
 					for _, tx := range pool.queue[addr] {
 						pool.RemoveTx(tx.Hash())
 					}
@@ -444,17 +490,21 @@ func (pool *TxPool) State() *ManagedState {
 
 // GetPendingTxsSize get txpool pending list amount
 func (pool *TxPool) GetPendingTxsSize() int {
-	return len(pool.GetPendingTxs())
+	return len(pool.pending)
 }
 
 // GetQueueSize get txpool queue list amount
 func (pool *TxPool) GetQueueSize() int {
-	return len(pool.GetQueues())
+	var queuesize = 0
+	for address := range pool.queue {
+		queuesize = queuesize + len(pool.queue[address])
+	}
+	return queuesize
 }
 
 // GetTxPoolSize get txpool all limit amount
 func (pool *TxPool) GetTxPoolSize() uint64 {
-	return uint64(pool.GetPendingTxsSize()) + uint64(pool.GetQueueSize())
+	return uint64(pool.GetPendingTxsSize() + pool.GetQueueSize())
 }
 
 func (pool *TxPool) RemoveTransactions(txs []*Transaction) {

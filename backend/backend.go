@@ -67,6 +67,7 @@ type Config struct {
 	StateDB *badger.Storage
 	ExtraDB *badger.Storage
 }
+
 type chainSyncProtocol struct {
 	syncMgr *syncMgr
 }
@@ -119,6 +120,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 	}
 	back.wallet = xfsgo.NewWallet(back.config.KeysDB)
 	back.txPool = xfsgo.NewTxPool(
+		nil, // nil TxPoolConfig
 		back.blockchain.CurrentStateTree,
 		back.blockchain.LatestGasLimit,
 		back.config.MinGasPrice, back.eventBus)

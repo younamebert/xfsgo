@@ -69,6 +69,18 @@ func (tx *TxPoolHandler) GetPendingSize(_ EmptyArgs, resp *int) error {
 	return nil
 }
 
+func (tx *TxPoolHandler) GetQueueSize(_ EmptyArgs, resp *int) error {
+	data := tx.TxPool.GetQueueSize()
+	*resp = data
+	return nil
+}
+
+func (tx *TxPoolHandler) GetTxPoolSize(_ EmptyArgs, resp *int) error {
+	data := tx.TxPool.GetTxPoolSize()
+	*resp = int(data)
+	return nil
+}
+
 func (tx *TxPoolHandler) RemoveTx(args RemoveTxHashArgs, resp *string) error {
 	if args.Hash == "" {
 		return xfsgo.NewRPCError(-1006, "Parameter cannot be empty")

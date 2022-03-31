@@ -51,10 +51,22 @@ var (
 		RunE:                  GetTransaction,
 	}
 	getTxpoolCountCommand = &cobra.Command{
-		Use:                   "count [options]",
+		Use:                   "total [options]",
 		DisableFlagsInUseLine: true,
 		Short:                 "transaction pool transaction number",
 		RunE:                  runTxPoolCount,
+	}
+	getTxpoolPendingSizeCommand = &cobra.Command{
+		Use:                   "pendingsize [options]",
+		DisableFlagsInUseLine: true,
+		Short:                 "transaction pool pending transaction number",
+		RunE:                  getTxPoolPendingSize,
+	}
+	getTxpoolQueueSizeCommand = &cobra.Command{
+		Use:                   "queuesize [options]",
+		DisableFlagsInUseLine: true,
+		Short:                 "transaction pool queue transaction number",
+		RunE:                  getTxPoolQueueSize,
 	}
 	clearTxPoolCommand = &cobra.Command{
 		Use:                   "clear [options]",
@@ -175,6 +187,40 @@ func GetQueue(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func getTxPoolQueueSize(cmd *cobra.Command, args []string) error {
+	config, err := parseClientConfig(cfgFile)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	cli := xfsgo.NewClient(config.rpcClientApiHost, config.rpcClientApiTimeOut)
+	var txPoolQueueCount int
+	err = cli.CallMethod(1, "TxPool.GetQueueSize", nil, &txPoolQueueCount)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	fmt.Println(txPoolQueueCount)
+	return nil
+}
+
+func getTxPoolPendingSize(cmd *cobra.Command, args []string) error {
+	config, err := parseClientConfig(cfgFile)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	cli := xfsgo.NewClient(config.rpcClientApiHost, config.rpcClientApiTimeOut)
+	var txPoolPendingCount int
+	err = cli.CallMethod(1, "TxPool.GetPendingSize", nil, &txPoolPendingCount)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	fmt.Println(txPoolPendingCount)
+	return nil
+}
+
 func runTxPoolCount(cmd *cobra.Command, args []string) error {
 	config, err := parseClientConfig(cfgFile)
 	if err != nil {
@@ -183,7 +229,7 @@ func runTxPoolCount(cmd *cobra.Command, args []string) error {
 	}
 	cli := xfsgo.NewClient(config.rpcClientApiHost, config.rpcClientApiTimeOut)
 	var txPoolCount int
-	err = cli.CallMethod(1, "TxPool.GetPendingSize", nil, &txPoolCount)
+	err = cli.CallMethod(1, "TxPool.GetTxPoolSize", nil, &txPoolCount)
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -227,6 +273,8 @@ func GetTransaction(cmd *cobra.Command, args []string) error {
 func init() {
 	rootCmd.AddCommand(getTxpoolCommand)
 	getTxpoolCommand.AddCommand(getTxpoolCountCommand)
+	getTxpoolCommand.AddCommand(getTxpoolPendingSizeCommand)
+	getTxpoolCommand.AddCommand(getTxpoolQueueSizeCommand)
 	getTxpoolCommand.AddCommand(getGetPendingCommand)
 	getTxpoolCommand.AddCommand(getGetQueueCommand)
 	getTxpoolCommand.AddCommand(getGetTranCommand)

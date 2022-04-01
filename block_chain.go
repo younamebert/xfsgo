@@ -819,8 +819,10 @@ func (bc *BlockChain) ApplyTransactions(stateTree *StateTree, header *BlockHeade
 	totalUsedGas := big.NewInt(0)
 	mGasPool := (*GasPool)(new(big.Int).Set(header.GasLimit))
 	for _, tx := range txs {
+		snap := stateTree.Copy()
 		rec, err := bc.ApplyTransaction(stateTree, header, tx, mGasPool, totalUsedGas)
 		if err != nil {
+			stateTree.Set(snap)
 			txhash := tx.Hash()
 			logrus.Errorf("Apply transaction err: hash=%x err=%v", txhash[len(txhash)-4:], err)
 			return nil, nil, err
@@ -914,6 +916,7 @@ func txPreCheck(stateTree *StateTree, tx *Transaction, gp *GasPool, gas *big.Int
 		return nil, err
 	}
 	sender := stateTree.GetOrNewStateObj(fromaddr)
+
 	if sender.GetNonce() != tx.Nonce {
 		return sender, fmt.Errorf("nonce err: want=%d, got=%d", sender.GetNonce(), tx.Nonce)
 	}
@@ -945,9 +948,10 @@ func (bc *BlockChain) ApplyTransaction(
 		status uint32
 	)
 
-	if err = bc.checkTransactionSanity(tx); err != nil {
+	if err = bc.checkTransactionSanity(tx); err != nil {)
 		return nil, err
 	}
+
 	if sender, err = txPreCheck(stateTree, tx, gp, gas); err != nil {
 		return nil, err
 	}

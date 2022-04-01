@@ -269,6 +269,16 @@ func (t *Transaction) FromAddr() (common.Address, error) {
 	return addr, nil
 }
 
+func (t *Transaction) FromAddress() common.Address {
+	pub, err := t.publicKey()
+	if err != nil {
+		logrus.Warnf("Failed parse from addr by signature: %s", err)
+		return common.Address{}
+	}
+	addr := crypto.DefaultPubKey2Addr(*pub)
+	return addr
+}
+
 func (t *Transaction) String() string {
 	jsondata, err := json.Marshal(t)
 	if err != nil {

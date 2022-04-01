@@ -195,6 +195,7 @@ func (m *Miner) Start(w uint32) {
 	m.started = true
 	m.shouldStart = true
 }
+
 func (m *Miner) SetWorkers(num uint32) error {
 	if num < 1 {
 		return errors.New("number too low")
@@ -205,6 +206,7 @@ func (m *Miner) SetWorkers(num uint32) error {
 	m.numWorkers = num
 	return nil
 }
+
 func (m *Miner) SetCoinbase(address common.Address) {
 	m.Coinbase = address
 }
@@ -296,15 +298,17 @@ func (m *Miner) applyTransactions(
 	//logrus.Debugf("Tx gas limit out of block limit-init: hash=%x, from=%x, mGasPool=%s", txfrom, pergp)
 	for _, tx := range txs {
 		txfrom, _ := tx.FromAddr()
-		txhash := tx.Hash()
-		_ = txhash
+		// txhash := tx.Hash()
+		// _ = txhash
 		if _, exists := ignoreTxs[txfrom]; exists {
-			//logrus.Warnf("Tx exists ignore obj: hash=%x, from=%x",
-			//	txhash[len(txhash)-4:], txfrom)
+			// logrus.Warnf("Tx exists ignore obj: hash=%x, from=%x",
+			// 	txhash[len(txhash)-4:], txfrom)
 			continue
 		}
+		snap := stateTree.Copy()
 		rec, err := m.chain.ApplyTransaction(stateTree, header, tx, mGasPool, totalUsedGas)
 		if err != nil {
+			stateTree.Set(snap)
 			if err.Error() == xfsgo.GasPoolOutErr.Error() {
 				//logrus.Errorf("Miner apply transaction err will be ignore: %s", err)
 				ignoreTxs[txfrom] = struct{}{}

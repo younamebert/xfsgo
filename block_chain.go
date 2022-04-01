@@ -187,7 +187,6 @@ func (bc *BlockChain) getBlockByNumber(num uint64) *Block {
 	if blockHeader == nil {
 		return nil
 	}
-
 	receipts := bc.extraDB.GetBlockReceiptsByBHash(blockHeader.HeaderHash())
 
 	transantions := bc.extraDB.GetBlockTransactionsByBHash(blockHeader.HeaderHash())
@@ -948,7 +947,7 @@ func (bc *BlockChain) ApplyTransaction(
 		status uint32
 	)
 
-	if err = bc.checkTransactionSanity(tx); err != nil {)
+	if err = bc.checkTransactionSanity(tx); err != nil {
 		return nil, err
 	}
 

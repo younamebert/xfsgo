@@ -58,7 +58,7 @@ func createMiner(t *testing.T) *Miner {
 		return nil
 	}
 
-	txPool := xfsgo.NewTxPool(bc.CurrentStateTree, bc.LatestGasLimit, test.TestTxPoolGasPrice, event)
+	txPool := xfsgo.NewTxPool(nil, bc.CurrentStateTree, bc.LatestGasLimit, test.TestTxPoolGasPrice, event)
 	config := &Config{
 		Coinbase:   common.Hex2Address(test.TestMinerCoinbase),
 		Numworkers: test.TestMinerWorkers,

@@ -88,8 +88,8 @@ func (tx *TxPoolHandler) RemoveTx(args RemoveTxHashArgs, resp *string) error {
 	if err := common.HashCalibrator(args.Hash); err != nil {
 		return xfsgo.NewRPCErrorCause(-32001, err)
 	}
-	txHash := common.Hex2Hash(args.Hash)
-	tx.TxPool.RemoveTx(txHash)
+	txobj := tx.TxPool.GetTransaction(common.Hex2Hash(args.Hash))
+	tx.TxPool.RemoveTx(txobj)
 	return nil
 }
 

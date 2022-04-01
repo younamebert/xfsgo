@@ -159,7 +159,7 @@ func defaultBootstrapNodes(netid uint32) []string {
 	if netid == 2 {
 		// test net boot nodes
 		return []string{
-			// // SG
+			// SG
 			"xfsnode://139.180.144.201:9011/?id=f477a4ad00870704fec42af8c056e5f8e799caa1b40c3b50a6e7137a2ece33d03a0a386f19a8fc80f1023455f640c20a903f1c154adecae312c92a072e9d0fc5",
 			// JP
 			"xfsnode://45.63.126.195:9011/?id=4b2c14c672f8df9fa61d69d7c3f1e2a6334f18a22674d7c66cb1e3adae7a76c4933953970e8e9840734cdb6f9b2a639fd0e79eada381443345e668e45d89f95d",

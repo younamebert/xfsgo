@@ -148,7 +148,7 @@ func getStatus(_ *cobra.Command, _ []string) error {
 	if err != nil {
 		return nil
 	}
-	//fmt.Printf("json: %s\n", res)
+
 	var statusStr string
 	if res["status"].(bool) {
 		statusStr = "Running"

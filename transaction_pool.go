@@ -145,7 +145,7 @@ func (pool *TxPool) add(tx *Transaction) error {
 		drop := int(pool.GetTxPoolSize()) - int(pool.config.TxPoolMaxSize-1)
 		dropmap := pool.priced[len(pool.priced)-drop:]
 		for _, tx := range dropmap {
-			pool.RemoveTx(tx.Hash())
+			pool.RemoveTx(tx)
 		}
 		pool.priced = pool.priced[:len(pool.priced)-drop]
 		// pool.updatePriced(newPriced)
@@ -174,7 +174,6 @@ func (pool *TxPool) add(tx *Transaction) error {
 func (pool *TxPool) addPriced(tx *Transaction) {
 	pool.priced = append(pool.priced, tx)
 	sort.Sort(TxByPrice(pool.priced))
-	// common.MarshalIndent(pool)
 }
 
 // func (pool *TxPool) updatePriced(tx []*Transaction) {
@@ -199,7 +198,7 @@ func (pool *TxPool) expirationLoop() {
 				// Any non-locals old enough should be removed
 				if time.Since(pool.beats[addr]) > pool.config.Lifetime {
 					for _, tx := range pool.queue[addr] {
-						pool.RemoveTx(tx.Hash())
+						pool.RemoveTx(tx)
 					}
 				}
 			}
@@ -372,7 +371,7 @@ func (pool *TxPool) resetState() {
 		if addr, err := tx.FromAddr(); err == nil {
 			// Set the nonce. Transaction nonce can never be lower
 			// than the state nonce; validatePool took care of that.
-			if pool.pendingState.GetNonce(addr) <= tx.Nonce {
+			if pool.pendingState.GetNonce(addr) < tx.Nonce {
 				pool.pendingState.SetNonce(addr, tx.Nonce+1)
 			}
 
@@ -511,24 +510,31 @@ func (pool *TxPool) RemoveTransactions(txs []*Transaction) {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 	for _, tx := range txs {
-		pool.RemoveTx(tx.Hash())
+		pool.RemoveTx(tx)
 	}
 }
-func (pool *TxPool) RemoveTx(hash common.Hash) {
-	// delete from pending pool
 
-	delete(pool.pending, hash)
+func (pool *TxPool) RemoveTx(transfer *Transaction) {
+
+	txHash := transfer.Hash()
+	// delete from pending pool
+	delete(pool.pending, txHash)
+
 	// delete from queue
 	for address, txs := range pool.queue {
-		if _, ok := txs[hash]; ok {
+		if _, ok := txs[txHash]; ok {
 			if len(txs) == 1 {
 				// if only one tx, remove entire address entry.
 				delete(pool.queue, address)
 			} else {
-				delete(txs, hash)
+				delete(txs, txHash)
 			}
 			break
 		}
+	}
+	// Update the account nonce if needed
+	if nonce := transfer.Nonce; pool.pendingState.GetNonce(transfer.FromAddress()) > nonce {
+		pool.pendingState.SetNonce(transfer.FromAddress(), nonce)
 	}
 }
 

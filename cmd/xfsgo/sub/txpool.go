@@ -51,7 +51,7 @@ var (
 		RunE:                  GetTransaction,
 	}
 	getTxpoolCountCommand = &cobra.Command{
-		Use:                   "total [options]",
+		Use:                   "count [options]",
 		DisableFlagsInUseLine: true,
 		Short:                 "transaction pool transaction number",
 		RunE:                  runTxPoolCount,

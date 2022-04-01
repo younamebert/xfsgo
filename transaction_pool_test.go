@@ -50,7 +50,7 @@ func setupTxPool() (*TxPool, *ecdsa.PrivateKey) {
 		return nil, nil
 	}
 
-	txPool := NewTxPool(bc.CurrentStateTree, bc.LatestGasLimit, test.TestTxPoolGasPrice, event)
+	txPool := NewTxPool(nil, bc.CurrentStateTree, bc.LatestGasLimit, test.TestTxPoolGasPrice, event)
 	return txPool, key
 }
 

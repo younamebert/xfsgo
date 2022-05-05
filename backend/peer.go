@@ -19,7 +19,6 @@ package backend
 import (
 	"encoding/json"
 	"errors"
-	"github.com/sirupsen/logrus"
 	"math/big"
 	"sync"
 	"time"
@@ -27,6 +26,8 @@ import (
 	"xfsgo/common"
 	"xfsgo/p2p"
 	"xfsgo/p2p/discover"
+
+	"github.com/sirupsen/logrus"
 )
 
 type syncpeer interface {
@@ -438,12 +439,14 @@ func (p *peer) SendObject(mType uint8, data interface{}) error {
 
 type peerSet struct {
 	mu    sync.RWMutex
-	peers map[discover.NodeId]syncpeer
+	peers map[discover.NodeId]*peerLevel
+	all   peerslist
 }
 
 func newPeerSet() *peerSet {
 	return &peerSet{
-		peers: make(map[discover.NodeId]syncpeer),
+		peers: make(map[discover.NodeId]*peerLevel),
+		all:   make(peerslist, 0),
 	}
 }
 
@@ -451,24 +454,27 @@ func (ps *peerSet) appendPeer(p syncpeer) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 	if _, exists := ps.peers[p.ID()]; exists {
+		return
 	}
-	ps.peers[p.ID()] = p
+	addpeer := newpeerLevel(p.ID(), p)
+	ps.all.Push(addpeer)
+	ps.peers[p.ID()] = addpeer
 }
 
-func (ps *peerSet) peerMap() map[discover.NodeId]syncpeer {
+func (ps *peerSet) peerMap() map[discover.NodeId]*peerLevel {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 	return ps.peers
 }
 
-func (ps *peerSet) peerList() []syncpeer {
+func (ps *peerSet) peerList() peerslist {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
-	all := make([]syncpeer, 0, len(ps.peers))
-	for _, v := range ps.peers {
-		all = append(all, v)
-	}
-	return all
+	// all := make([]syncpeer, 0, len(ps.peers))
+	// for _, v := range ps.peers {
+	// 	all = append(all, v)
+	// }
+	return ps.all
 }
 
 func (ps *peerSet) rmPeer(id discover.NodeId) {
@@ -477,6 +483,7 @@ func (ps *peerSet) rmPeer(id discover.NodeId) {
 	if _, exists := ps.peers[id]; !exists {
 		return
 	}
+	ps.peers[id].UpdatereFusePeer()
 	delete(ps.peers, id)
 }
 
@@ -484,17 +491,19 @@ func (ps *peerSet) dropPeer(pid discover.NodeId) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 	if p, exists := ps.peers[pid]; exists {
-		delete(ps.peers, pid)
-		p.Close()
+		// delete(ps.peers, pid)
+		p.UpdatereFusePeer()
+		p.syncpeer.Close()
 	}
 }
+
 func (ps *peerSet) setHeight(id discover.NodeId, height uint64) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 	if _, exists := ps.peers[id]; !exists {
 		return
 	}
-	ps.peers[id].SetHeight(height)
+	ps.peers[id].syncpeer.SetHeight(height)
 }
 
 func (ps *peerSet) setHead(id discover.NodeId, head common.Hash) {
@@ -503,14 +512,14 @@ func (ps *peerSet) setHead(id discover.NodeId, head common.Hash) {
 	if _, exists := ps.peers[id]; !exists {
 		return
 	}
-	ps.peers[id].SetHead(head)
+	ps.peers[id].syncpeer.SetHead(head)
 }
 
 func (ps *peerSet) get(id discover.NodeId) syncpeer {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 	if p, exists := ps.peers[id]; exists {
-		return p
+		return p.syncpeer
 	}
 	return nil
 }
@@ -536,6 +545,7 @@ func (ps *peerSet) basePeer() syncpeer {
 	}
 	return base
 }
+
 func (ps *peerSet) reset() {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()

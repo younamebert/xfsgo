@@ -566,6 +566,7 @@ func (mgr *syncMgr) fetchBlocks(from uint64, id discover.NodeId) error {
 		}
 	}
 }
+
 func (mgr *syncMgr) recordSync(num uint64) {
 	mgr.lastRecord = num
 }

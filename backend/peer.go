@@ -389,6 +389,7 @@ func (p *peer) addKnownBlock(hash common.Hash) {
 		p.knownBlocks[hash] = struct{}{}
 	}
 }
+
 func (p *peer) addKnownTx(hash common.Hash) {
 	p.knownTxsLock.Lock()
 	defer p.knownTxsLock.Unlock()
@@ -457,7 +458,8 @@ func (ps *peerSet) appendPeer(p syncpeer) {
 		return
 	}
 	addpeer := newpeerLevel(p.ID(), p)
-	ps.all.Push(addpeer)
+
+	ps.all = append(ps.all, addpeer)
 	ps.peers[p.ID()] = addpeer
 }
 
@@ -467,14 +469,15 @@ func (ps *peerSet) peerMap() map[discover.NodeId]*peerLevel {
 	return ps.peers
 }
 
-func (ps *peerSet) peerList() peerslist {
+func (ps *peerSet) peerList() []syncpeer {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
-	// all := make([]syncpeer, 0, len(ps.peers))
-	// for _, v := range ps.peers {
-	// 	all = append(all, v)
-	// }
-	return ps.all
+	all := make([]syncpeer, 0, len(ps.peers))
+	for _, v := range *ps.all.ExcellentPeersQueue() {
+		all = append(all, v.Syncpeer)
+	}
+	return all
+	// return *ps.all.ExcellentPeersQueue()
 }
 
 func (ps *peerSet) rmPeer(id discover.NodeId) {
@@ -483,17 +486,18 @@ func (ps *peerSet) rmPeer(id discover.NodeId) {
 	if _, exists := ps.peers[id]; !exists {
 		return
 	}
-	ps.peers[id].UpdatereFusePeer()
+	// ps.peers[id].UpdatereFusePeer()
 	delete(ps.peers, id)
+	ps.all.Remove(id)
 }
 
 func (ps *peerSet) dropPeer(pid discover.NodeId) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 	if p, exists := ps.peers[pid]; exists {
-		// delete(ps.peers, pid)
-		p.UpdatereFusePeer()
-		p.syncpeer.Close()
+		delete(ps.peers, pid)
+		ps.all.Remove(pid)
+		p.Syncpeer.Close()
 	}
 }
 
@@ -503,7 +507,7 @@ func (ps *peerSet) setHeight(id discover.NodeId, height uint64) {
 	if _, exists := ps.peers[id]; !exists {
 		return
 	}
-	ps.peers[id].syncpeer.SetHeight(height)
+	ps.peers[id].Syncpeer.SetHeight(height)
 }
 
 func (ps *peerSet) setHead(id discover.NodeId, head common.Hash) {
@@ -512,14 +516,14 @@ func (ps *peerSet) setHead(id discover.NodeId, head common.Hash) {
 	if _, exists := ps.peers[id]; !exists {
 		return
 	}
-	ps.peers[id].syncpeer.SetHead(head)
+	ps.peers[id].Syncpeer.SetHead(head)
 }
 
-func (ps *peerSet) get(id discover.NodeId) syncpeer {
+func (ps *peerSet) get(id discover.NodeId) *peerLevel {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 	if p, exists := ps.peers[id]; exists {
-		return p.syncpeer
+		return p
 	}
 	return nil
 }
@@ -530,19 +534,17 @@ func (ps *peerSet) count() int {
 	return len(ps.peers)
 }
 
-func (ps *peerSet) basePeer() syncpeer {
+func (ps *peerSet) basePeer() *peerLevel {
 	var (
-		base       syncpeer = nil
-		baseHeight          = uint64(0)
+		base *peerLevel = nil
 	)
-	ps.mu.RLock()
-	defer ps.mu.RUnlock()
-	for _, v := range ps.peers {
-		if ph := v.Height(); ph > baseHeight {
-			base = v
-			baseHeight = ph
-		}
+
+	baseps := ps.all.SortLevelAndHeightbasePeer()
+	if baseps == nil {
+		return base
 	}
+	base = baseps[0]
+	logrus.Debugf("baseid:%v\n", base.Syncpeer.ID().String())
 	return base
 }
 
@@ -550,7 +552,7 @@ func (ps *peerSet) reset() {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 	for _, v := range ps.peers {
-		v.Reset()
+		v.Syncpeer.Reset()
 	}
 }
 
@@ -558,8 +560,8 @@ func (ps *peerSet) listAndShort() []syncpeer {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 	all := make([]syncpeer, 0, len(ps.peers))
-	for _, v := range ps.peers {
-		all = append(all, v)
+	for _, v := range *ps.all.ExcellentPeersQueue() {
+		all = append(all, v.Syncpeer)
 	}
 	return all
 }

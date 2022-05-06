@@ -135,7 +135,7 @@ func (mgr *syncMgr) handleTransactions(p discover.NodeId, txs RemoteTxs) error {
 		return errUnKnowPeer
 	}
 	for _, tx := range txs {
-		pn.AddTx(tx.Hash)
+		pn.Syncpeer.AddTx(tx.Hash)
 		var targetTx *xfsgo.Transaction
 		_ = common.Objcopy(tx, &targetTx)
 		if err := mgr.txPool.Add(targetTx); err != nil {
@@ -169,12 +169,12 @@ func (mgr *syncMgr) handleNewBlock(p discover.NodeId, block *RemoteBlock) error 
 	if pn == nil {
 		return errUnKnowPeer
 	}
-	if blockHeight > pn.Height() {
+	if blockHeight > pn.Syncpeer.Height() {
 		mgr.peers.setHeight(p, blockHeight)
 		mgr.peers.setHead(p, blockHash)
 		go mgr.Synchronise(pn)
 	}
-	pn.AddBlock(block.Header.Hash)
+	pn.Syncpeer.AddBlock(block.Header.Hash)
 	go mgr.BroadcastBlock(block)
 	return nil
 }
@@ -514,7 +514,7 @@ func (mgr *syncMgr) fetchBlocks(from uint64, id discover.NodeId) error {
 					_ = common.Objcopy(block, &mBlock)
 					blocks = append(blocks, mBlock)
 				}
-				err := mgr.queue.Deliver(p, blocks)
+				err := mgr.queue.Deliver(p.Syncpeer, blocks)
 				if err != nil {
 					logrus.Errorf("Fetch block err: %v", err)
 				}
@@ -604,7 +604,7 @@ func (mgr *syncMgr) peerReportString(id discover.NodeId) (string, error) {
 	if p == nil {
 		return "", errors.New("notfound peer")
 	}
-	paddr := p.P2PPeer().RemoteNode().TcpAddr()
+	paddr := p.Syncpeer.P2PPeer().RemoteNode().TcpAddr()
 	return fmt.Sprintf("%x@%s", id[:4], paddr.String()), nil
 }
 func (mgr *syncMgr) syncWithPeer(p syncpeer) error {
@@ -662,27 +662,29 @@ func (mgr *syncMgr) synchronise(pid discover.NodeId) error {
 	mgr.cancelLock.Unlock()
 	ps := mgr.peers
 	var p syncpeer
-	if p = ps.get(pid); p == nil {
+	if p = ps.get(pid).Syncpeer; p == nil {
 		return errUnKnowPeer
 	}
 	return mgr.syncWithPeer(p)
 }
 
-func (mgr *syncMgr) Synchronise(p syncpeer) {
+func (mgr *syncMgr) Synchronise(p *peerLevel) {
 	if p == nil {
 		return
 	}
 	chainHead := mgr.chain.CurrentBHeader()
 	currentHeight := chainHead.Height
 	//logrus.Infof("chainHead: %d, pheight: %d", currentHeight, p.Height())
-	if p.Height() <= currentHeight {
+	if p.Syncpeer.Height() <= currentHeight {
 		return
 	}
-	switch err := mgr.synchronise(p.ID()); err {
+	switch err := mgr.synchronise(p.Syncpeer.ID()); err {
 	case nil:
 		logrus.Infof("Synchronisation completed")
 	case errBusy:
 	default:
+		// Mark peer-to-peer network as rejected
+		p.UpdatereFusePeer()
 		logrus.Errorf("Synchronisation failed: %v", err)
 	}
 }
@@ -702,6 +704,7 @@ func (mgr *syncMgr) syncer() {
 		}
 	}
 }
+
 func (mgr *syncMgr) syncTransactions(p syncpeer) {
 	if mgr.txPool == nil {
 		return
@@ -716,11 +719,12 @@ func (mgr *syncMgr) syncTransactions(p syncpeer) {
 		txs:    mTxs,
 	}
 }
+
 func (mgr *syncMgr) txSyncLoop() {
 	send := func(pack txPack) {
 		peerId := pack.peerId
 		if p := mgr.peers.get(peerId); p != nil {
-			if err := p.SendTransactions(pack.txs); err != nil {
+			if err := p.Syncpeer.SendTransactions(pack.txs); err != nil {
 				logrus.Warnf("send txs err: %s", err)
 			}
 		}

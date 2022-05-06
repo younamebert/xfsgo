@@ -8,7 +8,6 @@ import (
 // peers grade system
 const (
 	primaryPeer = iota
-	secondaryPeer
 	tertiaryPeer
 )
 
@@ -30,10 +29,6 @@ func (p *peerLevel) UpdateExcellentPeer() {
 	p.Level = primaryPeer
 }
 
-func (p *peerLevel) UpdateOrdinaryPeer() {
-	p.Level = secondaryPeer
-}
-
 //UpdatereFusePeer In P2P network, deleting local peer connection has no effect, so we need to set its level to reject
 func (p *peerLevel) UpdatereFusePeer() {
 	p.Level = tertiaryPeer
@@ -41,46 +36,36 @@ func (p *peerLevel) UpdatereFusePeer() {
 
 type peerslist []*peerLevel
 
-func (ps peerslist) Len() int {
-	return len(ps)
-}
+func (ps *peerslist) SortLevelAndHeightbasePeer() peerslist {
+	primaryPeerList := ps.ExcellentPeersQueue()
 
-func (ps peerslist) Less(i, j int) bool {
-	return ps[i].Level < ps[j].Level
-}
+	var result peerslist
+	sortpsHeight := peersSortHeightList(*primaryPeerList)
 
-func (ps peerslist) Swap(i, j int) {
-	ps[i], ps[j] = ps[j], ps[i]
-}
+	heap.Init(&sortpsHeight)
 
-func (ps *peerslist) Push(x interface{}) {
-	*ps = append(*ps, x.(*peerLevel))
-}
-
-func (ps *peerslist) Pop() interface{} {
-	old := *ps
-	n := len(old)
-	x := old[n-1]
-	*ps = old[0 : n-1]
-	return x
-}
-
-func (ps *peerslist) BasePeers() {
-	heap.Init(ps)
-	for ps.Len() > 0 {
-		heap.Pop(ps)
+	for sortpsHeight.Len() > 0 {
+		result = append(result, heap.Pop(&sortpsHeight).(*peerLevel))
 	}
+	return result
+}
+
+func (ps *peerslist) Remove(id discover.NodeId) {
+	newps := make(peerslist, len(*ps)-1)
+	for _, v := range *ps {
+		if v.NodeId.String() != id.String() {
+			newps = append(newps, v)
+		}
+	}
+	ps = &newps
 }
 
 // AllPeers Get excellent and passed peers
 // Exclude reject level peer
 func (ps *peerslist) AllPeers() *peerslist {
 	result := make(peerslist, 0)
-	for _, v := range *ps {
-		if v.Level < tertiaryPeer {
-			result = append(result, v)
-		}
-	}
+	result = append(result, *ps.FusePeersQueue()...)
+	result = append(result, *ps.ExcellentPeersQueue()...)
 	return &result
 }
 
@@ -89,17 +74,6 @@ func (ps *peerslist) FusePeersQueue() *peerslist {
 	result := make(peerslist, 0)
 	for _, v := range *ps {
 		if v.Level == tertiaryPeer {
-			result = append(result, v)
-		}
-	}
-	return &result
-}
-
-// OrdinaryPeersQueue Get normal peer level queue
-func (ps *peerslist) OrdinaryPeersQueue() *peerslist {
-	result := make(peerslist, 0)
-	for _, v := range *ps {
-		if v.Level == secondaryPeer {
 			result = append(result, v)
 		}
 	}
@@ -115,4 +89,56 @@ func (ps *peerslist) ExcellentPeersQueue() *peerslist {
 		}
 	}
 	return &result
+}
+
+// type peerSortLevelList []*peerLevel
+
+// func (ps peerSortLevelList) Len() int {
+// 	return len(ps)
+// }
+
+// func (ps peerSortLevelList) Less(i, j int) bool {
+// 	return ps[i].Level < ps[j].Level
+// }
+
+// func (ps peerSortLevelList) Swap(i, j int) {
+// 	ps[i], ps[j] = ps[j], ps[i]
+// }
+
+// func (ps *peerSortLevelList) Push(x interface{}) {
+// 	*ps = append(*ps, x.(*peerLevel))
+// }
+
+// func (ps *peerSortLevelList) Pop() interface{} {
+// 	old := *ps
+// 	n := len(old)
+// 	x := old[n-1]
+// 	*ps = old[0 : n-1]
+// 	return x
+// }
+
+type peersSortHeightList []*peerLevel
+
+func (ps peersSortHeightList) Len() int {
+	return len(ps)
+}
+
+func (ps peersSortHeightList) Less(i, j int) bool {
+	return ps[i].Syncpeer.Height() > ps[j].Syncpeer.Height()
+}
+
+func (ps peersSortHeightList) Swap(i, j int) {
+	ps[i], ps[j] = ps[j], ps[i]
+}
+
+func (ps *peersSortHeightList) Push(x interface{}) {
+	*ps = append(*ps, x.(*peerLevel))
+}
+
+func (ps *peersSortHeightList) Pop() interface{} {
+	old := *ps
+	n := len(old)
+	x := old[n-1]
+	*ps = old[0 : n-1]
+	return x
 }

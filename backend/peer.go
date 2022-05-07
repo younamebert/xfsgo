@@ -457,8 +457,8 @@ func (ps *peerSet) appendPeer(p syncpeer) {
 	if _, exists := ps.peers[p.ID()]; exists {
 		return
 	}
+	//Here you can set the historical height of the comparison peer for elimination
 	addpeer := newpeerLevel(p.ID(), p)
-
 	ps.all = append(ps.all, addpeer)
 	ps.peers[p.ID()] = addpeer
 }
@@ -538,7 +538,6 @@ func (ps *peerSet) basePeer() *peerLevel {
 	var (
 		base *peerLevel = nil
 	)
-
 	baseps := ps.all.SortLevelAndHeightbasePeer()
 	if baseps == nil {
 		return base

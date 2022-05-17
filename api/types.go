@@ -86,8 +86,8 @@ type TransactionResp struct {
 	Value     *big.Int       `json:"value"`
 	From      string         `json:"from"`
 	Hash      common.Hash    `json:"hash"`
-	Data      []byte         `json:"data"`
-	Signature []byte         `json:"signature"`
+	Data      string         `json:"data"`
+	Signature string         `json:"signature"`
 }
 
 type MinerStartArgs struct {
@@ -219,6 +219,10 @@ func coverTx2Resp(tx *xfsgo.Transaction, dst **TransactionResp) error {
 	if err != nil {
 		return err
 	}
+    datahex := hex.EncodeToString(tx.Data)
+    signhex := hex.EncodeToString(tx.Signature)
+    result.Data = "0x" + datahex
+    result.Signature = "0x" + signhex
 	result.From = from.B58String()
 	return nil
 }
@@ -255,8 +259,11 @@ func coverState2Resp(state *xfsgo.StateObj, dst **StateObjResp) error {
 		result.StateRoot = &stateRoot
 	}
 	balance := state.GetBalance()
-	balanceText := balance.Text(10)
-	result.Balance = &balanceText
+    if balance == nil {
+        balance = big.NewInt(0)
+    }
+    balanceTextm := balance.Text(10)
+	result.Balance = &balanceTextm
 	result.Nonce = state.GetNonce()
 	*dst = result
 	return nil

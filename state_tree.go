@@ -25,6 +25,8 @@ import (
 	"xfsgo/common/ahash"
 	"xfsgo/common/rawencode"
 	"xfsgo/storage/badger"
+
+	"github.com/sirupsen/logrus"
 )
 
 //StateObj is an importment type which represents an xfs account that is being modified.
@@ -42,6 +44,7 @@ type StateObj struct {
 	stateRoot    common.Hash
 	cacheStorage map[[32]byte][]byte
 	db           badger.IStorage
+    mTree *avlmerkle.Tree
 }
 
 func loadBytesByMapKey(m map[string]string, key string) (data []byte, rt bool) {
@@ -213,11 +216,15 @@ func (so *StateObj) GetStateRoot() common.Hash {
 }
 
 func (so *StateObj) Update() {
+    st := so.getStateTree()
 	for k, v := range so.cacheStorage {
-		so.getStateTree().Put(so.makeStateKey(k), v)
+        logrus.Infof("saveas %s: 0x%x, 0x%x",so.address.B58String(), k, v)
+		st.Put(so.makeStateKey(k), v) 
 	}
-	stateRoot := so.getStateTree().Checksum()
-	so.stateRoot = common.Bytes2Hash(stateRoot)
+	stateRoot := st.Checksum()
+    logrus.Infof("save checksum: 0x%x", stateRoot)
+    // TODO: save stateRoot
+	// so.stateRoot = common.Bytes2Hash(stateRoot)
 	objRaw, _ := rawencode.Encode(so)
 	hash := ahash.SHA256(so.address[:])
 	so.merkleTree.Put(hash, objRaw)

@@ -135,7 +135,7 @@ func CreateAddress(addrHash common.Hash, nonce uint64) common.Address {
 	mix := append(addrHash[:], nonceBytes[:]...)
 	h := ahash.SHA256(mix)
     md := ahash.Ripemd160(h)
-    payload := append([]byte{common.DefaultAddressVersion}, md)
+    payload := append([]byte{common.DefaultAddressVersion}, md...)
     cs := common.Checksum(payload)
     full := append(payload, cs...)
 	return common.Bytes2Address(full)

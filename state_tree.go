@@ -198,7 +198,10 @@ func (so *StateObj) makeStateKey(key [32]byte) []byte {
 	return ahash.SHA256(append(so.address[:], key[:]...))
 }
 func (so *StateObj) getStateTree() *avlmerkle.Tree {
-	return avlmerkle.NewTree(so.db, so.stateRoot[:])
+    if so.mTree == nil {
+        so.mTree = avlmerkle.NewTree(so.db, so.stateRoot[:])
+    }
+    return so.mTree
 }
 
 func (so *StateObj) GetStateValue(key [32]byte) []byte {
@@ -223,8 +226,7 @@ func (so *StateObj) Update() {
 	}
 	stateRoot := st.Checksum()
     logrus.Infof("save checksum: 0x%x", stateRoot)
-    // TODO: save stateRoot
-	// so.stateRoot = common.Bytes2Hash(stateRoot)
+	so.stateRoot = common.Bytes2Hash(stateRoot)
 	objRaw, _ := rawencode.Encode(so)
 	hash := ahash.SHA256(so.address[:])
 	so.merkleTree.Put(hash, objRaw)

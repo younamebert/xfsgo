@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"xfsgo/common"
+	"xfsgo/common/ahash"
 	"xfsgo/core"
 	"xfsgo/crypto"
 )
@@ -16,7 +17,7 @@ type VM interface {
 }
 
 const (
-	magicNumberXVM = uint16(9168)
+	MagicNumberXVM = uint16(9168)
 )
 
 var (
@@ -69,7 +70,7 @@ func readXVMCode(code []byte, input []byte) (c []byte, id uint8, err error) {
 		return code, 0, errInvalidContractCode
 	}
 	m := binary.LittleEndian.Uint16(code[:2])
-	if m != magicNumberXVM {
+	if m != MagicNumberXVM {
 		return code, 0, errUnknownMagicNumber
 	}
 	c = code
@@ -112,7 +113,9 @@ func (vm *xvm) Run(addr common.Address, code []byte, input []byte) (err error) {
 }
 func (vm *xvm) Create(addr common.Address, input []byte) error {
 	nonce := vm.stateTree.GetNonce(addr)
-	caddr := crypto.CreateAddress(addr.Hash(), nonce)
+    fromAddressHashBytes := ahash.SHA256(addr[:])
+    fromAddressHash := common.Bytes2Hash(fromAddressHashBytes)
+	caddr := crypto.CreateAddress(fromAddressHash, nonce)
 	if err := vm.Run(caddr, nil, input); err != nil {
 		return err
 	}

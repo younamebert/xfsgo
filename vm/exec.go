@@ -11,6 +11,8 @@ import (
 	"xfsgo/common"
 	"xfsgo/common/ahash"
 	"xfsgo/core"
+
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -109,6 +111,7 @@ func (ce *builtinContractExec) updateContractState(stvs []*stv) (err error) {
 		if err != nil {
 			return err
 		}
+        logrus.Infof("set state: %s, %s, %x, %s", ce.address.B58String(), st.Name ,st.nameHash, string(jb))
 		ce.stateTree.SetState(ce.address, st.nameHash, jb)
 		//fmt.Printf("name: %s, hash: %x, type: %v, val: %s\n", st.Name, st.nameHash[:], st.Type, string(jb))
 	}
